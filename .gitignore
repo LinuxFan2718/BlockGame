@@ -1,0 +1,11 @@
+/target/
+**/target/
+/.venv/
+/.cache/
+__pycache__/
+*.py[cod]
+*.so
+*.pyd
+/.pytest_cache/
+/.ruff_cache/
+/runs/

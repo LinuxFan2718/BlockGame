@@ -1,0 +1,14 @@
+[package]
+name = "tic-tac-toe"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+description = "A small, deterministic tic-tac-toe engine for humans and learning agents"
+publish = false
+
+[lib]
+name = "tic_tac_toe"
+
+[[bin]]
+name = "tic-tac-toe"
+path = "src/main.rs"
