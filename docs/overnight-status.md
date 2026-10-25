@@ -1,5 +1,10 @@
 # Final overnight handoff — 2026-10-25 01:48 EDT
 
+**Later update:** Dennis authorized a new search/self-play phase on Sunday
+afternoon. Current work is in `docs/search-status.md` and
+`docs/search-experiment.md`. The historical stop below applies to the overnight
+PPO experiments, not that newly authorized phase.
+
 Automatic continuation `continue-blokus-rl-experiments` was DELETED successfully.
 The two last hypotheses (frozen-neural mixture and convolutional screen) failed
 their declared improvement criteria. This follows the user's condition to keep

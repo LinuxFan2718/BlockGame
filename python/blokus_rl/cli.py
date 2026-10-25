@@ -187,10 +187,16 @@ def main():
     duo_eval.add_argument("--games-per-seat", type=int, default=100)
     duo_eval.add_argument("--seed", type=int, default=90000)
     duo_eval.add_argument("--json", type=Path)
+    duo_eval.add_argument(
+        "--simulations", type=int, default=0, help="PUCT simulations per move; 0 plays raw policy"
+    )
     duo_play = commands.add_parser("duo-play", help="Play Blokus Duo in the terminal")
     duo_play.add_argument("checkpoint", help="Checkpoint path, random, largest, or frontier")
     duo_play.add_argument("--human", type=int, choices=(0, 1), default=0)
     duo_play.add_argument("--seed", type=int, default=42)
+    duo_play.add_argument(
+        "--simulations", type=int, default=0, help="PUCT simulations per bot move"
+    )
     commands.add_parser("duo-report", help="Rebuild the saved Blokus experiment report")
     args = parser.parse_args()
     try:
@@ -246,19 +252,19 @@ def main():
             from .duo_learning import BASELINES, evaluate_duo, load_duo, play_duo
 
             configure_torch(args.seed)
-            policy = (
-                args.checkpoint
-                if args.checkpoint in BASELINES
-                else load_duo(args.checkpoint)
-            )
+            policy = args.checkpoint if args.checkpoint in BASELINES else load_duo(args.checkpoint)
+            if args.simulations < 0:
+                raise ValueError("simulations must be nonnegative")
+            if args.simulations:
+                if isinstance(policy, str):
+                    raise ValueError("neural search requires a checkpoint")
+                from .duo_mcts import MctsPolicy
+
+                policy = MctsPolicy(policy, args.simulations)
             if args.command == "duo-play":
                 play_duo(policy, args.human, args.seed)
             else:
-                opponent = (
-                    args.opponent
-                    if args.opponent in BASELINES
-                    else load_duo(args.opponent)
-                )
+                opponent = args.opponent if args.opponent in BASELINES else load_duo(args.opponent)
                 result = evaluate_duo(policy, opponent, args.games_per_seat, args.seed)
                 print(json.dumps(result, indent=2))
                 if args.json:

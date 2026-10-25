@@ -116,7 +116,9 @@ def pack(records, indices=None):
 
 @torch.no_grad()
 def choose(game, policy, rng, *, sample=False):
-    """Uniform random, largest-piece baseline, or neural policy. No search/oracle."""
+    """Select with a baseline, raw neural policy, or supplied live search policy."""
+    if hasattr(policy, "select_action"):
+        return int(policy.select_action(game, rng))
     if isinstance(policy, str):
         actions, candidates = game.candidates()
         if policy == "random":
@@ -199,8 +201,21 @@ def evaluate_duo(policy, opponent="random", games_per_seat=100, seed=90000):
     return {
         "seed": seed,
         "opponent": opponent if isinstance(opponent, str) else "frozen_neural",
-        "opponent_mode": "baseline" if isinstance(opponent, str) else "sample",
-        "learner_mode": "greedy" if not isinstance(policy, str) else "baseline",
+        "opponent_mode": (
+            "mcts"
+            if hasattr(opponent, "select_action")
+            else "baseline"
+            if isinstance(opponent, str)
+            else "sample"
+        ),
+        "learner_mode": (
+            "mcts"
+            if hasattr(policy, "select_action")
+            else "baseline"
+            if isinstance(policy, str)
+            else "greedy"
+        ),
+        "learner_simulations": getattr(policy, "simulations", 0),
         "by_seat": seats,
         "games": 2 * games_per_seat,
         "wins": wins,

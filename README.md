@@ -11,6 +11,14 @@ For self-play, search-guided training, and exact never-lose checks, see the
 The completed [results discussion](docs/self-play-results.md) includes two neural
 policies verified never to lose from the normal start, playing either mark.
 
+Blokus Duo now has a separate live Rust search and AlphaZero-style self-play
+loop. Read the [rolling search experiment](docs/search-experiment.md) for the
+method, held-out comparisons, Pentobi benchmark and hardware measurements.
+Current jobs and follow-up steps are in [search status](docs/search-status.md).
+To play with search: `.venv/bin/blokus-rl duo-play
+runs/duo-frontier-training-342/best.pt --simulations 128`. Training entry point:
+`.venv/bin/python -m blokus_rl.duo_az --help`.
+
 ```sh
 uv sync --locked
 uv run blokus-rl inspect

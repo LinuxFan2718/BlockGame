@@ -19,6 +19,7 @@
 
 mod agent;
 pub mod duo;
+pub mod duo_search;
 mod game;
 
 pub use agent::{Agent, RandomAgent};

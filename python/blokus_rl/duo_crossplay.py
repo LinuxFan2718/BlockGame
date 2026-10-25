@@ -89,7 +89,11 @@ def evaluate_pair(policy, opponent, openings, seed=1790000, *, bootstrap=True):
     for seat in seats:
         seat["mean_margin"] = float(np.mean(seat.pop("margins")))
     return {
-        "mode": "greedy_vs_greedy",
+        "mode": "search_crossplay"
+        if any(hasattr(p, "select_action") for p in (policy, opponent))
+        else "greedy_vs_greedy",
+        "learner_simulations": getattr(policy, "simulations", 0),
+        "opponent_simulations": getattr(opponent, "simulations", 0),
         "opening_pairs": len(openings),
         "games": 2 * len(openings),
         "win_rate": float(np.mean(wins)),

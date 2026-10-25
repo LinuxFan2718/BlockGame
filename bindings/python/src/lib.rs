@@ -2,6 +2,7 @@
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use tic_tac_toe::duo;
+use tic_tac_toe::duo_search;
 use tic_tac_toe::{Game, Outcome, Player};
 
 fn player_from_name(name: &str) -> PyResult<Player> {
@@ -87,6 +88,7 @@ impl PyGame {
 fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PyGame>()?;
     module.add_class::<PyDuoGame>()?;
+    module.add_class::<PyDuoSearch>()?;
     module.add_function(wrap_pyfunction!(duo_pieces, module)?)?;
     Ok(())
 }
@@ -191,4 +193,55 @@ impl PyDuoGame {
 #[pyfunction]
 fn duo_pieces() -> Vec<Vec<(i8, i8)>> {
     duo::pieces().to_vec()
+}
+
+#[pyclass(name = "DuoSearch")]
+struct PyDuoSearch {
+    inner: duo_search::Search,
+}
+
+#[pymethods]
+impl PyDuoSearch {
+    #[new]
+    #[pyo3(signature=(game, exploration=1.5, virtual_loss=1.0))]
+    fn new(game: &PyDuoGame, exploration: f32, virtual_loss: f32) -> PyResult<Self> {
+        Ok(Self {
+            inner: duo_search::Search::new(game.inner.clone(), exploration, virtual_loss)
+                .map_err(PyValueError::new_err)?,
+        })
+    }
+    #[getter]
+    fn completed(&self) -> usize {
+        self.inner.completed()
+    }
+    #[getter]
+    fn pending(&self) -> usize {
+        self.inner.pending()
+    }
+    fn request(&mut self, py: Python<'_>, budget: usize) -> PyResult<Vec<(usize, PyDuoGame)>> {
+        let result = py
+            .detach(|| self.inner.request(budget))
+            .map_err(PyValueError::new_err)?;
+        Ok(result
+            .into_iter()
+            .map(|(token, inner)| (token, PyDuoGame { inner }))
+            .collect())
+    }
+    fn expand(&mut self, token: usize, priors: Vec<f32>, value: f32) -> PyResult<()> {
+        self.inner
+            .expand(token, priors, value)
+            .map_err(PyValueError::new_err)
+    }
+    fn stats(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
+        use pyo3::types::PyDict;
+        let stats = self.inner.stats().map_err(PyValueError::new_err)?;
+        let result = PyDict::new(py);
+        result.set_item("actions", stats.actions)?;
+        result.set_item("visits", stats.visits)?;
+        result.set_item("priors", stats.priors)?;
+        result.set_item("means", stats.means)?;
+        result.set_item("simulations", stats.simulations)?;
+        result.set_item("nodes", stats.nodes)?;
+        Ok(result.into_any().unbind())
+    }
 }
