@@ -17,6 +17,9 @@ method, held-out comparisons, Pentobi benchmark and hardware measurements.
 Current jobs and follow-up steps are in [search status](docs/search-status.md).
 The completed [search/self-play results and plots](docs/search-results.md)
 include both successful and failed comparisons, plus an independent Pentobi benchmark.
+The completed [Modal hardware comparison](docs/modal-results.md) measures complete
+search throughput on the Mac, L4 and H100; [the assessment](docs/modal-experiment.md)
+records costs and the decision to keep the current small network local.
 To play with search: `.venv/bin/blokus-rl duo-play
 runs/duo-frontier-training-342/best.pt --simulations 128`. Training entry point:
 `.venv/bin/python -m blokus_rl.duo_az --help`.

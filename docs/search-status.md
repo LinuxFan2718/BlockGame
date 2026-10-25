@@ -1,13 +1,13 @@
-# Search study complete; Modal upload awaits approval — 25 October 2026
+# Search and bounded Modal study complete — 25 October 2026
 
 Read `docs/search-results.md` for the compact results and plot,
 `docs/search-experiment.md` for methods, and `docs/modal-experiment.md` for cloud
-readiness and the approval block. Both local training runs, their held-out
+readiness and upload authorization. Both local training runs, their held-out
 comparisons, and the bounded checkpoint-selection follow-up are complete.
 A process check found no training/evaluation/Modal jobs still active. Do not
 restart or duplicate completed runs.
 
-## Authorization and current blocker
+## Authorization and current cloud step
 
 Dennis authorized continued RL work and up to **$130 of existing Modal credits
 if worthwhile**, explicitly choosing profile **linuxfan2718**. First benchmarking
@@ -18,14 +18,17 @@ messages to people or subagents are authorized.
 **Automatic approval review rejected the first Modal launch** because credit
 permission did not explicitly authorize uploading private source/model data.
 The human was asked to approve the allowlisted source archive and one checkpoint.
-The only subsequent human answer confirmed the account; there is no upload
-approval yet. Heartbeats are not approval. Do not retry, change transport, or
-bypass the rejection. No project data has been uploaded, no image built, and no
-Modal compute charged by this work. Read-only app listing succeeded.
+Dennis subsequently answered **“Yes, upload the code and model”** to that exact
+upload question. This resolves the export block for the prepared allowlisted
+source and frontier342 checkpoint. No upload or paid compute occurred before
+that approval. Read-only app listing returned no active apps.
 
-The follow-up schedule should be deleted after delivering the final local
-results because the remaining cloud work requires the human's reply. It should
-not keep polling for approval or silently start another training series.
+The previous follow-up schedule was deleted after the local report. The approved
+L4 and H100 benchmarks and matched Mac CPU measurements have now completed.
+Both Modal apps are stopped; no cloud training job or follow-up schedule is active.
+Provider-reported app usage totals $0.05911950 (about six cents), subject to billing
+updates. See [the cloud assessment](modal-experiment.md) and
+[hardware tables/plot](modal-results.md). Do not duplicate these completed studies.
 
 ## Completed evidence
 
@@ -89,17 +92,23 @@ not keep polling for approval or silently start another training series.
   4,709,648bytes, SHA256a1d01a595c98f292dec203bb9a0f9f13beb259c6a3caf3aaeec5b470c29a352c.
   Backups are local, not off-device protection.
 
-## Next after an explicit upload approval
+## Hardware decision and next hypothesis
 
-1. Read the actual human reply. Preserve its scope; do not infer it from spending
-   permission. Inspect current Modal apps and the cost ledger for duplicates.
-2. Run the prepared allowlisted `cloud/modal_blokus.py` L4 benchmark. It has one
-   GPU,4 capped CPU cores,8GiB capped memory,300second function timeout, no retries
-   and short scale-down. The runner is prepared and locally checked, **not yet
-   validated on Modal**. A build/runtime error must be reported honestly.
-3. Measure real search throughput/cost, not just neural FLOPS. Test the CNN as
-   well as the tiny MLP; their compute profiles differ substantially. Compare
-   H100 only if useful. Current CPU speedup changes the cost comparison.
-4. Use a concrete bounded next hypothesis for any larger experiment. The latest
-   checkpoint-selection hypothesis failed. No claim that CNNs or AlphaZero in
-   general fail is warranted, and no general superhuman Blokus result exists.
+The existing additive search achieves76.74 decisions/s on the Mac versus32.71
+on L4 and64.22 on H100 in CUDA fp32. Keep it local. The untrained CNN achieves
+21.83/31.06/66.73 respectively; H100 is faster but L4 delivers about1.86x more
+CNN search decisions per estimated steady execution dollar. CPU hosts differ,
+so these are complete-system measurements, not isolated GPU speed ratios.
+
+The prepared runner executed successfully with the exact allowlisted source and
+checkpoint. Both remote runs remained inside their300second limits. No crash,
+retry, duplicate app, top-up or model promotion occurred. The provider resource
+report, original executed source/script, hashes and cost ledger are saved locally.
+New report and benchmark utilities pass lint/format; unchanged model hashes were
+verified again. Original60 Python/21 Rust test results still apply to the unchanged
+game/training code.
+
+A concrete future scaling hypothesis is multiple CPU search workers sharing GPU
+inference, measured against CPU-only workers with the same simulations. A future
+CNN learning trial also needs a held-out strength test. Neither is running: this
+bounded study is finished, and no indefinite training series was launched.

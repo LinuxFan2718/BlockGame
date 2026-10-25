@@ -168,8 +168,12 @@ priors/Q values. The rules, training objectives and saved weights are unchanged.
 Full suite now60 Python tests and21 Rust tests, with clippy passing.
 
 Dennis subsequently offered Modal credits; see [the cloud experiment](modal-experiment.md).
-GPU comparison is prepared but awaiting explicit source/model upload permission
-after an automatic approval rejection. No Modal compute has been spent.
+Dennis explicitly approved source/model upload after the initial automatic
+approval rejection. The bounded L4/H100 study is complete: about six cents in
+provider-reported app usage. The Mac remains fastest for the small additive
+search; H100 accelerates the tested CNN, with L4 providing more throughput per
+dollar. These are hardware timings, not strength results; see
+[the tables and plot](modal-results.md).
 
 ## Commands
 

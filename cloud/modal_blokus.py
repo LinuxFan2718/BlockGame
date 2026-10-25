@@ -10,6 +10,7 @@ import io
 import json
 import tarfile
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 
 import modal
@@ -19,8 +20,10 @@ APP = "blokus-rl-hardware-benchmark"
 MAX_SECONDS = 300
 CPU_CORES = 4
 MEMORY_GIB = 8
-# Public list prices checked 2026-10-25; CPU/memory are added separately.
-RATES = {"l4": 0.000222, "h100": 0.001097}
+# Account billing API rates checked 2026-10-25; dollars/second.
+RATES = {"l4": 0.8 / 3600, "h100": 3.95 / 3600}
+CPU_RATE = 0.0473 / 3600
+MEMORY_RATE = 0.008 / 3600
 
 
 def source_archive():
@@ -144,6 +147,7 @@ def run_benchmark(checkpoint):
             else:
                 model = DuoConvActorCritic()
             model = model.eval().to(device)
+            print(f"Benchmark: {architecture}/{mode}", flush=True)
             context = (
                 torch.autocast("cuda", dtype=torch.bfloat16)
                 if mode == "cuda_bfloat16"
@@ -264,7 +268,8 @@ def main(gpu: str = "l4", out: str = "runs/modal-benchmark-l4-260642.json"):
     if destination.exists():
         raise ValueError("refusing to overwrite an existing benchmark")
     checkpoint = ROOT / "runs/duo-frontier-training-342/best.pt"
-    maximum = (RATES[gpu] + CPU_CORES * 0.0000131 + MEMORY_GIB * 0.00000222) * (MAX_SECONDS + 60)
+    resource_rate = RATES[gpu] + CPU_CORES * CPU_RATE + MEMORY_GIB * MEMORY_RATE
+    maximum = resource_rate * (MAX_SECONDS + 60)
     ledger = ROOT / "runs/modal-cost-ledger.jsonl"
     prior = (
         [json.loads(line) for line in ledger.read_text().splitlines()] if ledger.exists() else []
@@ -277,6 +282,7 @@ def main(gpu: str = "l4", out: str = "runs/modal-benchmark-l4-260642.json"):
         "gpu": gpu,
         "profile": "linuxfan2718",
         "status": "reserved",
+        "started_at_utc": datetime.now(timezone.utc).isoformat(),
         "reserved_compute_usd": maximum,
         "function_timeout_seconds": MAX_SECONDS,
         "cpu_limit": CPU_CORES,
@@ -293,13 +299,26 @@ def main(gpu: str = "l4", out: str = "runs/modal-benchmark-l4-260642.json"):
     function = benchmark_l4 if gpu == "l4" else benchmark_h100
     result = function.remote(checkpoint.read_bytes())
     result["budget"] = entry
-    result["estimated_execution_usd"] = (
-        RATES[gpu] + CPU_CORES * 0.0000131 + MEMORY_GIB * 0.00000222
-    ) * result["seconds"]
+    result["estimated_execution_usd"] = resource_rate * result["seconds"]
     result["billing_note"] = (
         "Estimate excludes build/startup and metering differences; inspect Modal billing for actual charges."
     )
     destination.write_text(json.dumps(result, indent=2) + "\n")
+    with ledger.open("a") as handle:
+        handle.write(
+            json.dumps(
+                {
+                    "gpu": gpu,
+                    "status": "completed",
+                    "out": str(destination),
+                    "finished_at_utc": datetime.now(timezone.utc).isoformat(),
+                    # Keep prior reservations counted; never recycle estimates as credits.
+                    "reserved_compute_usd": 0,
+                    "estimated_execution_usd": result["estimated_execution_usd"],
+                }
+            )
+            + "\n"
+        )
     print(
         json.dumps(
             {
