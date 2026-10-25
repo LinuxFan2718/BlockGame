@@ -59,6 +59,10 @@ def build():
     heldout = {
         name: read(root / f"duo-az-{name}-heldout-2549000/results.json") for name in training
     }
+    controls = {
+        name: read(root / f"duo-az-{name}-heldout-2549000/equal-search-control.json")
+        for name in training
+    }
     complete = all(
         (root / f"duo-az-{name}-heldout-2549000/completed.json").exists() for name in training
     )
@@ -69,6 +73,7 @@ def build():
         "external": external,
         "training": {},
         "heldout": heldout,
+        "equal_search_control": controls,
         "paired_external_gains": {},
         "heldout_pentobi_reference": {},
         "heldout_pentobi_gains": {},
@@ -158,10 +163,29 @@ def build():
                 text.append(row(f"{name}: {label}", result))
     text += [
         "",
+        "### Equal search budget: does training help the searched agent?",
+        "",
+        "| Run vs original searched reference | Games | W/D/L | Score | Paired 95% interval |",
+        "| --- | ---: | --- | ---: | --- |",
+    ]
+    for name, result in controls.items():
+        if result:
+            text.append(row(name + " search128 vs reference search128", result))
+    text += [
+        "",
+        "Both players get 128 simulations/move. This is an additional diagnostic on "
+        "the original held-out openings, with already-frozen checkpoints; no model was "
+        "selected or changed from these results. Other reported intervals are nominal "
+        "95%, with no correction for the many exploratory comparisons.",
+    ]
+    text += [
+        "",
         "The in-repo reference is the original frontier-342 network. Largest specialist "
         "means longer-margin-243; largest/frontier alone mean hand-written baselines. "
         "Normal-start deterministic games are saved separately as exactly two games without "
-        "an uncertainty estimate. See each held-out protocol for hashes and frozen copies.",
+        "an uncertainty estimate. See each held-out protocol for hashes and frozen copies. "
+        "Warm raw_vs_initial and raw_vs_reference use the same opponent and openings; "
+        "their duplicate rows are not independent evidence.",
     ]
     text += [
         "",
@@ -195,7 +219,37 @@ def build():
         "Method, commands and preservation details: [rolling experiment](search-experiment.md). "
         "Run `python -m blokus_rl.duo_search_report` to regenerate this report.",
     ]
+    followup = root / "duo-az-warm-search-selection-2559000"
+    selection = read(followup / "selection.json")
+    newtest = read(followup / "test-results.json")
+    if selection and newtest:
+        summary["search_selection_followup"] = {"selection": selection, "test": newtest}
+        text += [
+            "",
+            "## Follow-up: select checkpoints using searched validation play",
+            "",
+            "This adaptive follow-up compared rounds 4/8/12/16/20/24/28/32 of the existing "
+            "warm-start run on 40 validation opening pairs, both agents using 128 simulations. "
+            "It added **zero training games**. Selection used seed2543000; the test used a "
+            "fresh seed 2559000, generated only after freezing the selected checkpoint.",
+            "",
+            f"Selected round: **{selection['selected_round']}**; validation score "
+            f"**{percentage(selection['validation_score'])}**. The declared primary success "
+            "criterion required a fresh-test searched-vs-searched 95% lower bound above 50%.",
+            "",
+            "| Fresh test | Games | W/D/L | Score | Paired 95% interval |",
+            "| --- | ---: | --- | ---: | --- |",
+        ]
+        text.extend(row(label, result) for label, result in newtest.items())
+        text += [
+            "",
+            "**Failed** that criterion: selecting on searched validation did not produce "
+            "a confirmed improvement on the new test. Do not promote this round 24 checkpoint "
+            "over the original selected round 8 model from these results. This is not a "
+            "replication of round 8 on the new seed, because a different checkpoint was tested.",
+        ]
     fig, axes = plt.subplots(2, 2, figsize=(11, 8), layout="constrained")
+    matplotlib.rcParams["svg.hashsalt"] = "blokus-search-study"
 
     def points(ax, items, labels):
         for i, result in enumerate(items):
@@ -218,7 +272,7 @@ def build():
     )
     for name, rows in training.items():
         values = [r for r in rows if "validation" in r]
-        label = f"{name} vs " + ("random initial" if name == "cold" else "frontier initial")
+        label = f"{name} vs " + ("untrained initial" if name == "cold" else "frontier initial")
         axes[1, 0].plot(
             [r["games"] for r in values],
             [100 * r["validation"]["score_rate"] for r in values],
@@ -234,11 +288,10 @@ def build():
     axes[1, 0].legend(fontsize=8)
     axes[1, 0].grid(alpha=0.2)
     items, labels = [], []
-    for name, results in heldout.items():
-        for label in ["raw_vs_reference", "search_vs_reference"]:
-            if results and label in results:
-                items.append(results[label])
-                labels.append(name + "\n" + ("raw" if label.startswith("raw") else "search128"))
+    for name, result in controls.items():
+        if result:
+            items.append(result)
+            labels.append(name)
     if items:
         points(axes[1, 1], items, labels)
     else:
@@ -250,13 +303,15 @@ def build():
             va="center",
             transform=axes[1, 1].transAxes,
         )
-    axes[1, 1].set(title="Held-out vs original frontier network", ylim=(0, 100))
+    axes[1, 1].set(title="Held-out: both agents use search128", ylim=(0, 100))
     axes[1, 1].axhline(50, color="gray", ls="--")
     fig.suptitle("Blokus Duo: search, self-play and an outside benchmark", fontsize=14)
     asset = Path("docs/assets")
     asset.mkdir(exist_ok=True)
     fig.savefig(asset / "search-results.png", dpi=170)
-    fig.savefig(asset / "search-results.svg")
+    svg = asset / "search-results.svg"
+    fig.savefig(svg, metadata={"Date": None})
+    svg.write_text("\n".join(line.rstrip() for line in svg.read_text().splitlines()) + "\n")
     plt.close(fig)
     Path("docs/search-results.md").write_text("\n".join(text) + "\n")
     (root / "duo-search-summary.json").write_text(json.dumps(summary, indent=2) + "\n")

@@ -1,103 +1,105 @@
-# Active search work — 25 October 2026
+# Search study complete; Modal upload awaits approval — 25 October 2026
 
-New authorization: Dennis asked to implement and try search and self-play after
-Claude's review. The old overnight stop applies to the completed PPO screens.
-Read `docs/search-experiment.md`, this file, then current logs before any work.
-Do not launch duplicates. No subagents, paid cloud, publishing or messages to people.
+Read `docs/search-results.md` for the compact results and plot,
+`docs/search-experiment.md` for methods, and `docs/modal-experiment.md` for cloud
+readiness and the approval block. Both local training runs, their held-out
+comparisons, and the bounded checkpoint-selection follow-up are complete.
+A process check found no training/evaluation/Modal jobs still active. Do not
+restart or duplicate completed runs.
 
-## Running
+## Authorization and current blocker
 
-- Cold-start self-play: `runs/duo-az-cold-642.log` and
-  `runs/duo-az-cold-642/progress.jsonl`. 32 rounds × 128 games = 4096 games,
-  128 simulations per move, 3 workers. Process session 96235.
-- Warm-start self-play: `runs/duo-az-warm-643.log` and
-  `runs/duo-az-warm-643/progress.jsonl`. Same budget, initial frontier-342.
-  Process session 34123. Parent PIDs49482 (cold) and49491 (warm) were checked;
-  six one-thread workers were active, without duplicates. These are two
-  intentional different arms, not duplicate training jobs.
-- Search-budget confirmation completed: `runs/duo-search-confirm-2542000/`;
-  128 scored60.25% vs raw; 512 scored71.5% (pairedCI66.75–76.5%).
-- External search benchmark completed: `runs/duo-pentobi-search128-2551000.log`;
-  100 paired openings vs Pentobi level1: 9% score.
-- Matched external raw benchmark completed:
-  `runs/duo-pentobi-raw100-2551000.log`, 6.5% score. Difference +2.5points,
-  pairedCI+0.25 to +5.0. Independent raw seed2552000 score7.25%.
-- Higher-budget outside comparison completed:
-  `runs/duo-pentobi-search512-2551000.log`. 24W/4D/172L, score13%,
-  paired95%CI8.5–17.75%; gain over matched raw +6.5points,
-  paired95%CI+3.25 to +10.0. 391 seconds, not matched compute against Pentobi.
-- Matched reserved-seed Pentobi reference evaluations started in this follow-up:
-  `runs/duo-pentobi-reference-raw-2549000.log` (session78676),
-  `runs/duo-pentobi-reference-search128-2549000.log` (session62975).
-  They use unchanged frontier342 weights and the same reserved openings that
-  selected self-play checkpoints will face. They cannot affect selection or
-  the already-fixed training configurations.
+Dennis authorized continued RL work and up to **$130 of existing Modal credits
+if worthwhile**, explicitly choosing profile **linuxfan2718**. First benchmarking
+stage is capped at **$5 estimated**, with bounded single-GPU functions. No top-ups,
+plan changes, spending beyond the authorized credits, publishing, pushes,
+messages to people or subagents are authorized.
 
-Heartbeat check at15:26EDT found both training parents and all six workers
-healthy, both around round24 of32. No resumption or duplicate training was needed.
-By the report snapshot both passed3328games. Cold validation vs its random
-initial model is high; warm validation against frontier342 fluctuates. Neither
-is held-out evidence. Let the remaining bounded rounds finish.
+**Automatic approval review rejected the first Modal launch** because credit
+permission did not explicitly authorize uploading private source/model data.
+The human was asked to approve the allowlisted source archive and one checkpoint.
+The only subsequent human answer confirmed the account; there is no upload
+approval yet. Heartbeats are not approval. Do not retry, change transport, or
+bypass the rejection. No project data has been uploaded, no image built, and no
+Modal compute charged by this work. Read-only app listing succeeded.
 
-Follow-up schedule `finish-blokus-search-and-self-play-study` was created for
-this chat every15minutes. It should finish these bounded runs, evaluations and
-report, then delete itself. It must not restart the deleted overnight automation
-or silently begin an indefinite series of training jobs.
+The follow-up schedule should be deleted after delivering the final local
+results because the remaining cloud work requires the human's reply. It should
+not keep polling for approval or silently start another training series.
 
-## Completed
+## Completed evidence
 
-- Rust PUCT tree + batched PyTorch bridge and self-play trainer implemented.
-- Native on-demand search; no exhaustive Blokus state table, training oracle or
-  heuristic opponent. Exact endgame tests both perspectives pass.
-- 57 Python tests pass, including bit-identical resumption after a simulated
-  between-round interruption. All21 Rust tests pass; core clippy passes.
-- Five old-policy search-budget arms: see run results; 128-sim fresh confirmation
-  116W/9D/75L, score60.25%, paired95%CI56–64.5% over200 games.
-- Pentobi31.0 source pinned and built. Adapter cross-checks a complete legal game
-  and final margin. Raw policy vs level1 on fresh200 games: 12W/5D/183L,
-  score7.25%, pairedCI4–11%. This challenges heuristic-only rankings.
-- CPU/MPS inference benchmark favors CPU for current tiny model; 6 worker cores
-  are used for two training arms. No conclusion about CNNs or large GPU jobs.
-- Existing runs backed up locally before search work; certified TTT preserved.
-- Pentobi seeding was checked by replaying the identical seeded match with an
-  unrelated match in between; the complete move sequence and outcome matched.
-  Its set_random_seed command resets existing random generators, not only new ones.
+- Source baseline:896a7e0; initial search implementation:24a915c;
+  benchmark/report preparation:c8ba2dc. Further validated changes are saved in
+  the final local commit. No remote is configured and nothing is pushed.
+- `duo-az-cold-642` and `duo-az-warm-643`: **4096 training games each**, 32 rounds,
+  128 simulations/move,3 CPU workers per run. About35.59million simulations and
+  29.69million neural positions across both runs; about32minutes concurrently.
+  Both have completed.json and atomic optimizer/replay/RNG resume bundles.
+- Cold selected round24: raw scores90.5% vs its untrained initial network and
+  59.5% vs the largest-piece heuristic, but40.75% vs original frontier342.
+  With128-simulation search it scores39.75% vs equally searched frontier342.
+  Cold start learned useful behavior; it did not become our strongest agent.
+- Warm selected round8: raw49% vs initial frontier342, paired95%CI42.5–55.25%.
+  With128-simulation search, **61.25% vs equally searched frontier342**,
+  115W/15D/70L, paired95%CI55–67.25%. This is an exploratory positive result for
+  the searched agent, not evidence of improved raw play or universal strength.
+- Outside benchmark is Pentobi31.0 level1, no book/resign, one thread, explicit
+  rotation/pass translation and independent final-score checks. Warm raw/search
+  scores7%/9.25% on reserved seed2549000, original reference2.5%/6.75% on identical
+  openings. Even the improved agent remains much weaker than Pentobi level1.
+- Original unchanged frontier342 with512 simulations scored71.5% against its raw
+  policy on200 games, paired95%CI66.75–76.5%, and13% against Pentobi on matched
+  seed2551000, CI8.5–17.75%. These are different comparisons/openings from the
+  trained-agent tests; do not rank their percentages across datasets.
+- All held-out cases use100 randomized four-ply openings in both seats. Bootstrap
+  resamples whole pairs. One training seed per condition, nominal intervals,
+  multiple exploratory comparisons; these are not human ratings or guarantees.
 
-## Next
+## Completed follow-up and performance work
 
-1. Let both bounded 4096-game runs finish. Check logs for exceptions. They have
-   atomic round checkpoints. A fresh run command cannot reuse an existing folder;
-   `--resume` requires the exact original flags from protocol.json and loads the
-   completed round's weights/replay/optimizer/RNG from resume.pt. Smoke run predates
-   this final resume-bundle enhancement; do not resume that obsolete smoke.
-2. Freeze best.pt and final.pt; evaluate best on **reserved** test seed2549000 with
-   100 four-ply paired openings, raw and search128 vs initial frontier342, plus
-   heuristic and Pentobi checks. Keep validation and held-out evidence distinct.
-   Compare cold against random initial and strong fixed baseline; warm against
-   its initial policy. Empty-board deterministic games are exactly two, no CI.
+- `runs/duo-az-warm-search-selection-2559000/`: bounded, zero additional training.
+  Eight existing checkpoints were compared using40 validation opening pairs,
+  both agents with128 simulations. Round24 selected (58.125% validation score).
+  Fresh seed2559000,100 pairs: searched49.5%, CI43.75–55.25%; raw52%, CI45.75–58.01%.
+  **Failed** its declared primary criterion. Preserve round8 and this negative
+  evidence; do not promote round24. It is not a replication of round8.
+- Profiling the original small-model pipeline found about4% of time in neural
+  evaluation; most time was duplicate move generation and Python object/array
+  conversion. The new native packed observation buffers reuse cached search
+  actions and remove those conversions. Same128 decisions and16384 simulations:
+  old4.70/4.45seconds, new1.62/1.62seconds, approximately**2.8x faster**.
+  The action sequences, search visits/priors/Q values and observations match
+  the reference path exactly in the checks. No change to game rules or weights.
+- Native feature buffers have independent reference tests across complete games,
+  both seats and forced passes. bfloat16 inference crosses NumPy safely.
+  **60 Python tests and21 Rust tests pass**; binding/core clippy and formatting pass.
+- Regenerate: `.venv/bin/python -m blokus_rl.duo_search_report`.
+  Figures: `docs/assets/search-results.{png,svg}`. Data summary:
+  `runs/duo-search-summary.json`. Reports preserve both positive and negative results.
 
-   ```sh
-   .venv/bin/python -m blokus_rl.duo_az_evaluate --run runs/duo-az-cold-642 --out runs/duo-az-cold-heldout-2549000
-   .venv/bin/python -m blokus_rl.duo_az_evaluate --run runs/duo-az-warm-643 --out runs/duo-az-warm-heldout-2549000
-   ```
+## Preservation
 
-   The evaluator refuses unfinished runs, freezes copies/hashes, and tests raw
-   against initial/reference/largest/frontier/largest-specialist, search128 against reference, and
-   raw/search128 against Pentobi on100openingpairs each. It also records exactly
-   two deterministic empty-board games. End-to-end evaluator smoke passed.
-   Selected, final, initial and reference checkpoints (including the largest
-   specialist) are copied and hashed before any cases run. Updated smoke passed.
-3. Record actual learning curves and total simulated positions, not only game
-   counts. Make a compact plot/report. Preserve negative results.
-   Implemented: `.venv/bin/python -m blokus_rl.duo_search_report` generates
-   `docs/search-results.md`, `docs/assets/search-results.{png,svg}` and
-   `runs/duo-search-summary.json`. Regenerate after held-out results complete.
-4. If raw/search performance improves, next hypothesis may increase games/search
-   or try a spatial network on the same loop. A poor 4096-game run doesn't reject
-   AlphaZero. Decide next budget from observed failures and throughput.
-5. Commit validated code/docs locally, never push. Existing baseline896a7e0 has no
-   remote. Runs are ignored; maintain recovery archive/manifest, disk budget.
+- Original certified tic-tac-toe and frontier checkpoints remain byte-identical
+  to the pre-search archive; hashes in runs/search-preserved-checkpoints.json.
+- `.backups/runs-before-search-20261025.tar.gz`:824 original files, about51MB.
+- `.backups/search-study-20261025.tar.gz`:163 completed study/profile files,
+  78,286,589bytes, SHA256c3516dfe88ded2924078bac9eb6564bf4989b57de942653ecd8160be2944ef5e.
+- `.backups/search-selection-20261025.tar.gz`: completed selection follow-up,
+  4,709,648bytes, SHA256a1d01a595c98f292dec203bb9a0f9f13beb259c6a3caf3aaeec5b470c29a352c.
+  Backups are local, not off-device protection.
 
-Notify Dennis only for meaningful results or a failure needing action. No claim
-of optimal, superhuman or human-level play is supported. Pentobi is evaluation
-only; do not train on its moves without an explicit change of experiment.
+## Next after an explicit upload approval
+
+1. Read the actual human reply. Preserve its scope; do not infer it from spending
+   permission. Inspect current Modal apps and the cost ledger for duplicates.
+2. Run the prepared allowlisted `cloud/modal_blokus.py` L4 benchmark. It has one
+   GPU,4 capped CPU cores,8GiB capped memory,300second function timeout, no retries
+   and short scale-down. The runner is prepared and locally checked, **not yet
+   validated on Modal**. A build/runtime error must be reported honestly.
+3. Measure real search throughput/cost, not just neural FLOPS. Test the CNN as
+   well as the tiny MLP; their compute profiles differ substantially. Compare
+   H100 only if useful. Current CPU speedup changes the cost comparison.
+4. Use a concrete bounded next hypothesis for any larger experiment. The latest
+   checkpoint-selection hypothesis failed. No claim that CNNs or AlphaZero in
+   general fail is warranted, and no general superhuman Blokus result exists.

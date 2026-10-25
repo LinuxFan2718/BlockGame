@@ -3,6 +3,7 @@ import pytest
 import torch
 from blokus_rl._native import DuoGame, DuoSearch
 from blokus_rl.duo_az import AzConfig, fit
+from blokus_rl.duo_env import decision, legacy_decision
 from blokus_rl.duo_mcts import search_games
 from blokus_rl.duo_model import DuoActorCritic
 from blokus_rl.duo_pentobi import DEFAULT_BINARY, Pentobi, match, move_cells, move_string
@@ -121,6 +122,45 @@ def test_coordinate_rotation_round_trip():
         cells = frozenset([0, 1, 14, 60, 135])
         assert move_cells(move_string(cells, rotate), rotate) == cells
         assert move_cells(move_string([], rotate), rotate) == frozenset()
+
+
+def test_bfloat16_search_crosses_numpy_boundary_safely():
+    configure_torch(642)
+    game = DuoGame()
+    with torch.autocast("cpu", dtype=torch.bfloat16):
+        result = search_games(DuoActorCritic(16), [game], 16)[0]
+    assert result.action() in game.legal_actions()
+    assert result.policy.dtype == np.float32
+    assert np.isfinite(result.priors).all()
+    assert result.visits.sum() == 16
+
+
+def test_native_feature_buffers_match_reference_for_complete_games():
+    for seed in range(4):
+        game = DuoGame()
+        rng = np.random.default_rng(seed)
+        while not game.terminated:
+            native = decision(game)
+            reference = legacy_decision(game)
+            assert all(np.array_equal(a, b) for a, b in zip(native, reference, strict=True))
+            assert all(a.flags.writeable for a in native)
+            game.step(int(rng.choice(game.legal_actions())))
+        with pytest.raises(ValueError):
+            decision(game)
+
+
+def test_native_leaf_features_preserve_search_visits_exactly():
+    configure_torch(260642)
+    model = DuoActorCritic(32)
+    games = [DuoGame(), DuoGame()]
+    games[1].step(games[1].legal_actions()[123])
+    fast = search_games(model, games, 128, native_features=True)
+    reference = search_games(model, games, 128, native_features=False)
+    for a, b in zip(fast, reference, strict=True):
+        assert np.array_equal(a.visits, b.visits)
+        assert np.array_equal(a.priors, b.priors)
+        assert np.array_equal(a.means, b.means)
+        assert a.action() == b.action()
 
 
 def test_self_play_resume_restores_weights_optimizer_replay_and_rng(tmp_path, monkeypatch):

@@ -1,4 +1,5 @@
 //! A thin Python boundary. All board changes and rewards come from the Rust engine.
+mod duo_features;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use tic_tac_toe::duo;
@@ -174,6 +175,16 @@ impl PyDuoGame {
             .collect();
         (actions, features)
     }
+    fn decision_data(&self, py: Python<'_>) -> PyResult<duo_features::Buffers> {
+        if self.inner.is_terminal() {
+            return Err(PyValueError::new_err("terminal positions have no decision"));
+        }
+        let encoded = py.detach(|| {
+            let actions = self.inner.legal_actions();
+            duo_features::encode(&self.inner, &actions)
+        });
+        Ok(duo_features::buffers(py, encoded))
+    }
     fn describe(&self, action: usize) -> PyResult<(usize, usize, usize, Vec<usize>)> {
         let p = duo::placement(action).ok_or_else(|| PyValueError::new_err("not a placement"))?;
         Ok((p.piece, p.row, p.col, p.cells.clone()))
@@ -225,6 +236,28 @@ impl PyDuoSearch {
         Ok(result
             .into_iter()
             .map(|(token, inner)| (token, PyDuoGame { inner }))
+            .collect())
+    }
+    fn request_decisions(
+        &mut self,
+        py: Python<'_>,
+        budget: usize,
+    ) -> PyResult<Vec<(usize, duo_features::Buffers)>> {
+        let encoded = py
+            .detach(|| {
+                self.inner
+                    .request(budget)?
+                    .into_iter()
+                    .map(|(token, game)| {
+                        let actions = self.inner.pending_actions(token)?;
+                        Ok((token, duo_features::encode(&game, actions)))
+                    })
+                    .collect::<Result<Vec<_>, String>>()
+            })
+            .map_err(PyValueError::new_err)?;
+        Ok(encoded
+            .into_iter()
+            .map(|(token, data)| (token, duo_features::buffers(py, data)))
             .collect())
     }
     fn expand(&mut self, token: usize, priors: Vec<f32>, value: f32) -> PyResult<()> {

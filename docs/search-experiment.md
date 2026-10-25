@@ -115,7 +115,7 @@ Measured inference includes returning results to the CPU, as actual search needs
 Saved measurements: `runs/search-hardware.json`. CPU inference wins for this
 small additive network. This does not settle GPU training or larger CNNs.
 
-Two runs are underway, each **4,096 games**, **128 simulations/move**, 32 rounds,
+Two runs completed, each **4,096 games**, **128 simulations/move**, 32 rounds,
 128 games/round, 3 one-thread self-play workers, 8 live games per worker, 20,000
 replay positions, 100 gradient steps/round, minibatch 128, AdamW learning rate
 0.0003. Network architecture stays constant to isolate the learning-loop change.
@@ -132,11 +132,44 @@ selects raw policies versus the frozen initial network on 40 paired openings,
 every four rounds. The initial policy is retained if validation never exceeds 50%.
 This selection criterion alone is insufficient to establish general strength.
 
-After training, freeze the selected checkpoints and test against the original
-frontier policy, largest specialist, heuristics and Pentobi on held-out seeds.
-Report raw and searched performance separately. Look for an interval above 50%
-against the frozen reference and improvement outside that one opponent, without
-calling a single small run a general verdict on self-play or architecture.
+Selected checkpoints were frozen and tested against the original frontier
+policy, largest specialist, heuristics and Pentobi on held-out seed2549000.
+Raw and searched agents are reported separately in [the results](search-results.md).
+
+The cold-start policy scored90.5% against its untrained initial network and59.5%
+against largest-piece, but40.75% against frontier342. This demonstrates useful
+learning from random weights, without reaching our prior strongest policy.
+
+The warm-start policy selected round8 (1024 games of the4096-game run). Raw play
+scored49% against frontier342 (paired95%CI42.5–55.25%), failing to reproduce its
+60.625% validation peak. With128-simulation search, however, it scored61.25%
+against frontier342 using **the same128-simulation budget** (115W/15D/70L;
+CI55–67.25%). That extra equal-budget comparison used frozen models after the
+main study. It supports improvement of this searched agent, while one training
+seed and many exploratory comparisons limit broader conclusions.
+
+An adaptive follow-up selected among eight existing checkpoints using searched
+validation play, then tested once on fresh seed2559000. Round24 selected with
+58.125% validation score, but fresh searched score49.5% (CI43.75–55.25%) failed
+its declared criterion. It added zero training games. Its complete protocol,
+copied checkpoints and results are in runs/duo-az-warm-search-selection-2559000/.
+Do not promote that checkpoint or describe this as a round8 replication.
+
+## Faster search before renting hardware
+
+A profile of32 live games over four searched plies found only about4% of the
+original MLP pipeline in neural evaluation. Generating the legal list twice and
+building nested Python lists dominated. New native observation buffers reuse
+the search's cached legal actions and expose writable NumPy buffers directly.
+On identical positions, weights, actions and16384 simulations, two old timings
+were4.70/4.45seconds; new timings1.62/1.62seconds: approximately**2.8x faster**.
+Independent tests match every observation/candidate and exact search visits,
+priors/Q values. The rules, training objectives and saved weights are unchanged.
+Full suite now60 Python tests and21 Rust tests, with clippy passing.
+
+Dennis subsequently offered Modal credits; see [the cloud experiment](modal-experiment.md).
+GPU comparison is prepared but awaiting explicit source/model upload permission
+after an automatic approval rejection. No Modal compute has been spent.
 
 ## Commands
 
@@ -159,7 +192,7 @@ cmake --build .local/pentobi-build --target pentobi-gtp --parallel 4
 Full reproducible arguments are stored in each run's `protocol.json`. Current
 jobs, failures and next steps belong in `docs/search-status.md`.
 The regenerable compact [results report](search-results.md) and figure distinguish
-completed planning benchmarks, validation learning curves, and pending held-out
+completed planning benchmarks, validation learning curves, and completed held-out
 tests. Update with `.venv/bin/python -m blokus_rl.duo_search_report`.
 
 Statistical limit: percentile bootstrap intervals describe variability among

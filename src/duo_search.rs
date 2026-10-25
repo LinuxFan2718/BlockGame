@@ -84,6 +84,16 @@ impl Search {
         self.pending_count
     }
 
+    /// Legal order already generated for a pending leaf; avoid generating it
+    /// again when encoding a neural observation across a language boundary.
+    pub fn pending_actions(&self, token: usize) -> Result<&[usize], String> {
+        let node = self.nodes.get(token).ok_or("unknown leaf token")?;
+        if node.pending.is_none() {
+            return Err("leaf token is not pending".into());
+        }
+        Ok(&node.actions)
+    }
+
     fn backup(&mut self, path: &[(usize, usize)], mut value: f32, virtual_path: bool) {
         for &(node, action) in path.iter().rev() {
             value = -value; // Leaf/current player -> previous player, once per ply.

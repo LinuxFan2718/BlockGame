@@ -1,6 +1,7 @@
 /target/
 **/target/
 /.venv/
+/.venv-modal/
 /.cache/
 __pycache__/
 *.py[cod]

@@ -15,6 +15,8 @@ Blokus Duo now has a separate live Rust search and AlphaZero-style self-play
 loop. Read the [rolling search experiment](docs/search-experiment.md) for the
 method, held-out comparisons, Pentobi benchmark and hardware measurements.
 Current jobs and follow-up steps are in [search status](docs/search-status.md).
+The completed [search/self-play results and plots](docs/search-results.md)
+include both successful and failed comparisons, plus an independent Pentobi benchmark.
 To play with search: `.venv/bin/blokus-rl duo-play
 runs/duo-frontier-training-342/best.pt --simulations 128`. Training entry point:
 `.venv/bin/python -m blokus_rl.duo_az --help`.

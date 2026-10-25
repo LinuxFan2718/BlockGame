@@ -7,7 +7,7 @@ import numpy as np
 import torch
 
 from ._native import DuoSearch
-from .duo_env import decision
+from .duo_env import decode_decision, legacy_decision
 from .duo_learning import pack
 
 
@@ -43,6 +43,7 @@ def search_games(
     root_noise=0.25,
     noise_mass=10.0,
     metrics=None,
+    native_features=True,
 ):
     if simulations < 1 or leaf_batch < 1 or inference_batch < 1:
         raise ValueError("positive simulation and batch sizes required")
@@ -63,8 +64,13 @@ def search_games(
             remaining = simulations - tree.completed
             if remaining <= 0:
                 continue
-            for token, game in tree.request(min(leaf_batch, remaining)):
-                observation, actions, candidates = decision(game)
+            budget = min(leaf_batch, remaining)
+            entries = (
+                [(token, decode_decision(data)) for token, data in tree.request_decisions(budget)]
+                if native_features
+                else [(token, legacy_decision(game)) for token, game in tree.request(budget)]
+            )
+            for token, (observation, actions, candidates) in entries:
                 record = {"observation": observation, "candidates": candidates}
                 pending.append((index, token, record, len(actions)))
                 if token == 0:
@@ -75,8 +81,9 @@ def search_games(
             distribution, values = model.distribution(
                 batch["observation"], batch["candidates"], batch["action_mask"]
             )
-            probabilities = distribution.probs.cpu().numpy()
-            values = values.flatten().clamp(-1, 1).cpu().numpy()
+            # NumPy cannot represent bfloat16; the Rust boundary always uses f32.
+            probabilities = distribution.probs.float().cpu().numpy()
+            values = values.flatten().clamp(-1, 1).float().cpu().numpy()
             for row, (index, token, _, count) in enumerate(subset):
                 priors = probabilities[row, :count].astype(np.float64)
                 if token == 0 and rngs is not None and root_noise:

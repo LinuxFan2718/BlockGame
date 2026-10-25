@@ -54,6 +54,20 @@ def decision(game: DuoGame):
     Candidate = [piece_id, cell0, ..., cell4]. Cell 196 means padding;
     piece 21 means a forced pass. These are geometry, not heuristic move scores.
     """
+    return decode_decision(game.decision_data())
+
+
+def decode_decision(buffers):
+    observation, actions, candidates = buffers
+    return (
+        np.frombuffer(observation, dtype="<f4"),
+        np.frombuffer(actions, dtype="<i4"),
+        np.frombuffer(candidates, dtype="<i2").reshape(-1, 6),
+    )
+
+
+def legacy_decision(game: DuoGame):
+    """Independent reference encoding retained for exact compatibility checks."""
     if game.terminated:
         raise ValueError("terminal positions have no decision")
     player = game.current_player
