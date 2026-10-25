@@ -92,6 +92,14 @@ The paired difference is +2.5 score points, 95% interval +0.25 to +5.0 points.
 Search helps modestly on this set and remains much weaker than Pentobi. Results:
 `runs/duo-pentobi-{raw100,search128}-2551000/`. No human-level claim follows.
 
+The same 200-game external comparison at **512 simulations** finished with
+24W/4D/172L, **13%** score (paired95%CI8.5–17.75%), mean margin −15.685.
+Compared with the raw policy on identical opening pairs, the gain is +6.5 score
+points (paired95%CI+3.25 to +10.0). Increasing search helps against this outside
+opponent too, while remaining much weaker than level1. Runtime was 391 seconds;
+this is not a matched-compute comparison against Pentobi. Data:
+`runs/duo-pentobi-search512-2551000/`.
+
 ## Hardware and first training budgets
 
 The Mac has 8 CPU cores and 16 GiB RAM. Metal is available outside the sandbox.
@@ -150,6 +158,9 @@ cmake --build .local/pentobi-build --target pentobi-gtp --parallel 4
 
 Full reproducible arguments are stored in each run's `protocol.json`. Current
 jobs, failures and next steps belong in `docs/search-status.md`.
+The regenerable compact [results report](search-results.md) and figure distinguish
+completed planning benchmarks, validation learning curves, and pending held-out
+tests. Update with `.venv/bin/python -m blokus_rl.duo_search_report`.
 
 Statistical limit: percentile bootstrap intervals describe variability among
 sampled openings. When every opening has the same outcome they collapse; that

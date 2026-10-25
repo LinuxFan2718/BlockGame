@@ -22,8 +22,10 @@ def evaluate(run, out, reference, openings=100, seed=2549000, simulations=128):
     configure_torch(seed)
     sources = {
         "selected": run / "best.pt",
+        "final": run / "final.pt",
         "reference": Path(reference),
         "initial": run / "initial.pt",
+        "largest_specialist": Path("runs/duo-longer-margin-243/best.pt"),
     }
     paths = {}
     for name, path in sources.items():
@@ -51,6 +53,7 @@ def evaluate(run, out, reference, openings=100, seed=2549000, simulations=128):
         ("search_vs_reference", searched, models["reference"]),
         ("raw_vs_largest", models["selected"], "largest"),
         ("raw_vs_frontier", models["selected"], "frontier"),
+        ("raw_vs_largest_specialist", models["selected"], models["largest_specialist"]),
     ]
     for label, policy, opponent in cases:
         start = time.monotonic()
