@@ -15,6 +15,21 @@ from ._native import DuoGame
 from .duo_env import CELLS, PASS, STATE_SIZE
 
 
+def install_orientation_lookup(model):
+    """Stable shape-code lookup shared by spatial policies; no learned weights."""
+    game = DuoGame()
+    codes, pieces = [], []
+    for orientation in range(91):
+        piece, _, _, cells = game.describe(orientation * CELLS)
+        codes.append(sum(1 << ((cell // 14) * 5 + cell % 14) for cell in cells))
+        pieces.append(piece)
+    ordered = sorted((code, i) for i, code in enumerate(codes))
+    ordered.insert(0, (0, 91))
+    model.register_buffer("shape_codes", torch.tensor([x[0] for x in ordered]))
+    model.register_buffer("shape_ids", torch.tensor([x[1] for x in ordered]))
+    model.register_buffer("orientation_pieces", torch.tensor(pieces))
+
+
 class DuoConvActorCritic(nn.Module):
     architecture = "conv"
 
@@ -47,17 +62,7 @@ class DuoConvActorCritic(nn.Module):
         nn.init.orthogonal_(self.value_head.weight, 1)
         # Stable Rust orientation ids are derived from normalized geometry.
         # This also handles the observer's 180-degree coordinate rotation.
-        game = DuoGame()
-        codes, pieces = [], []
-        for orientation in range(91):
-            piece, _, _, cells = game.describe(orientation * CELLS)
-            codes.append(sum(1 << ((cell // 14) * 5 + cell % 14) for cell in cells))
-            pieces.append(piece)
-        ordered = sorted((code, i) for i, code in enumerate(codes))
-        ordered.insert(0, (0, 91))  # padded/forced-pass candidate
-        self.register_buffer("shape_codes", torch.tensor([x[0] for x in ordered]))
-        self.register_buffer("shape_ids", torch.tensor([x[1] for x in ordered]))
-        self.register_buffer("orientation_pieces", torch.tensor(pieces))
+        install_orientation_lookup(self)
 
     def forward(self, observation):
         batch_shape = observation.shape[:-1]

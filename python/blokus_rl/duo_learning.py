@@ -342,6 +342,9 @@ def save_duo(path, model, config, update, *, parent=None, metadata=None):
             "state_size": model.state_size,
             "observation_version": 2,
             "hidden_size": model.hidden_size,
+            "architecture_config": {
+                key: getattr(model, key) for key in ("channels", "blocks") if hasattr(model, key)
+            },
             "model_state": model.state_dict(),
             "config": asdict(config),
             "update": update,
@@ -360,14 +363,16 @@ def load_duo(path):
     if checkpoint.get("game") != "blokus_duo" or checkpoint.get("format_version") not in (1, 2, 3):
         raise ValueError("not a supported Blokus Duo checkpoint")
     from .duo_conv import DuoConvActorCritic
+    from .duo_residual import DuoResidualActorCritic
 
     architecture = checkpoint.get("architecture", "additive")
-    if architecture not in ("additive", "conv"):
+    if architecture not in ("additive", "conv", "residual"):
         raise ValueError("unsupported model architecture")
     with torch.random.fork_rng(devices=[]):
-        model = (DuoConvActorCritic if architecture == "conv" else DuoActorCritic)(
-            checkpoint["hidden_size"]
+        factory = {"conv": DuoConvActorCritic, "residual": DuoResidualActorCritic}.get(
+            architecture, DuoActorCritic
         )
+        model = factory(checkpoint["hidden_size"], **checkpoint.get("architecture_config", {}))
     weights = dict(checkpoint["model_state"])
     first = weights.get("trunk.0.weight")
     if first is not None and first.shape[1] < STATE_SIZE:

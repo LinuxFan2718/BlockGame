@@ -22,6 +22,9 @@ search throughput on the Mac, L4 and H100; [the assessment](docs/modal-experimen
 records costs and the decision to keep the current small network local.
 The [AlphaBlokus source study](docs/alphablokus-study.md) explains its published
 residual CNN, four-player search, self-play targets and GPU batching.
+A shorter [saved explanation](docs/alphablokus-explanation.md) follows the learning
+loop. The [deep CNN overnight study](docs/deep-self-play.md) and
+[current status](docs/deep-status.md) cover the new cold-start comparison.
 To play with search: `.venv/bin/blokus-rl duo-play
 runs/duo-frontier-training-342/best.pt --simulations 128`. Training entry point:
 `.venv/bin/python -m blokus_rl.duo_az --help`.

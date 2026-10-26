@@ -44,6 +44,7 @@ def search_games(
     noise_mass=10.0,
     metrics=None,
     native_features=True,
+    evaluator=None,
 ):
     if simulations < 1 or leaf_batch < 1 or inference_batch < 1:
         raise ValueError("positive simulation and batch sizes required")
@@ -53,7 +54,11 @@ def search_games(
         raise ValueError("one root-noise RNG per game required")
     if not 0 <= root_noise <= 1 or noise_mass <= 0:
         raise ValueError("invalid root noise")
-    device = next(model.parameters()).device
+    if evaluator is None:
+
+        def evaluator(records):
+            return evaluate_records(model, records)
+
     trees = [DuoSearch(game, exploration, 1.0) for game in games]
     roots = {}
     start = time.monotonic()
@@ -77,13 +82,7 @@ def search_games(
                     roots[index] = (observation, actions, candidates)
         for offset in range(0, len(pending), inference_batch):
             subset = pending[offset : offset + inference_batch]
-            batch = pack([entry[2] for entry in subset]).to(device)
-            distribution, values = model.distribution(
-                batch["observation"], batch["candidates"], batch["action_mask"]
-            )
-            # NumPy cannot represent bfloat16; the Rust boundary always uses f32.
-            probabilities = distribution.probs.float().cpu().numpy()
-            values = values.flatten().clamp(-1, 1).float().cpu().numpy()
+            probabilities, values = evaluator([entry[2] for entry in subset])
             for row, (index, token, _, count) in enumerate(subset):
                 priors = probabilities[row, :count].astype(np.float64)
                 if token == 0 and rngs is not None and root_noise:
@@ -120,6 +119,21 @@ def search_games(
         metrics["simulations"] = metrics.get("simulations", 0) + simulations * len(games)
         metrics["search_seconds"] = metrics.get("search_seconds", 0.0) + time.monotonic() - start
     return results
+
+
+@torch.no_grad()
+def evaluate_records(model, records):
+    """Default in-process inference; injectable inference preserves the Rust search."""
+    device = next(model.parameters()).device
+    batch = pack(records).to(device)
+    distribution, values = model.distribution(
+        batch["observation"], batch["candidates"], batch["action_mask"]
+    )
+    # NumPy cannot represent bfloat16; the Rust boundary always uses f32.
+    return (
+        distribution.probs.float().cpu().numpy(),
+        values.flatten().clamp(-1, 1).float().cpu().numpy(),
+    )
 
 
 class MctsPolicy:
