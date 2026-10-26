@@ -20,6 +20,8 @@ include both successful and failed comparisons, plus an independent Pentobi benc
 The completed [Modal hardware comparison](docs/modal-results.md) measures complete
 search throughput on the Mac, L4 and H100; [the assessment](docs/modal-experiment.md)
 records costs and the decision to keep the current small network local.
+The [AlphaBlokus source study](docs/alphablokus-study.md) explains its published
+residual CNN, four-player search, self-play targets and GPU batching.
 To play with search: `.venv/bin/blokus-rl duo-play
 runs/duo-frontier-training-342/best.pt --simulations 128`. Training entry point:
 `.venv/bin/python -m blokus_rl.duo_az --help`.

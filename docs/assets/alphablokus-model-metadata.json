@@ -1,0 +1,95 @@
+{
+  "source_commit": "b4470ef9667e7c6f000a0542bb3aaa4d5cce1292",
+  "graph_sha256": "43dce8062bcfcb57e8819db29bfb340545be1c368404a3c979085703d62831fa",
+  "inputs": [
+    {
+      "name": "board",
+      "shape": [
+        "batch_size",
+        4,
+        20,
+        20
+      ]
+    },
+    {
+      "name": "piece_availability",
+      "shape": [
+        "batch_size",
+        4,
+        21
+      ]
+    }
+  ],
+  "outputs": [
+    {
+      "name": "value",
+      "shape": [
+        "batch_size",
+        4
+      ]
+    },
+    {
+      "name": "policy",
+      "shape": [
+        "batch_size",
+        91,
+        20,
+        20
+      ]
+    }
+  ],
+  "operators": {
+    "Shape": 1,
+    "Concat": 10,
+    "Expand": 1,
+    "Conv": 24,
+    "Relu": 25,
+    "Reshape": 5,
+    "Gemm": 4,
+    "Split": 1,
+    "Gather": 19,
+    "Unsqueeze": 14,
+    "Add": 24,
+    "Mul": 7,
+    "ReduceMean": 1
+  },
+  "selected_initializer_shapes": {
+    "convolutional_block.0.weight": [
+      64,
+      6,
+      3,
+      3
+    ],
+    "residual_blocks.0.conv_1.weight": [
+      64,
+      64,
+      3,
+      3
+    ],
+    "residual_blocks.9.conv_2.weight": [
+      64,
+      64,
+      3,
+      3
+    ],
+    "piece_availability_encoder.0.weight": [
+      64,
+      84
+    ],
+    "film_projection.weight": [
+      896,
+      64
+    ],
+    "value_head.fc_2.weight": [
+      4,
+      64
+    ],
+    "policy_head.conv_2.weight": [
+      91,
+      64,
+      3,
+      3
+    ]
+  },
+  "note": "Read-only graph metadata inspection. Separate weight-data file not fetched; no inference or strength evaluation."
+}
