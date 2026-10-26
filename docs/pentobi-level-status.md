@@ -97,5 +97,25 @@ Exact executed source and runner are saved with the run-name/time prefix in runs
 
 Follow-up schedule **finish-pentobi-levels-1-9-benchmark** checks every15minutes,
 quiet during healthy progress, reports completion or an actionable failure, and
-deletes itself after the report. No new experiment follows this benchmark.
+deletes itself after the reports for both authorized jobs. Dennis subsequently
+authorized a separate controlled continuation study; see
+[continuation-status.md](continuation-status.md). It does not change this
+benchmark's frozen agent, openings or budget. The shared follow-up must avoid
+duplicating either job and finish each report independently.
 The cloud call continues independently if this Mac sleeps or disconnects.
+
+### First scheduled follow-up
+
+The 12:58UTC heartbeat verified healthy progress: one remote container and one
+local detached CLI client, with no duplicate training/evaluation process.
+The committed status downloaded during this check contained 21 completed pairs
+at levels1–6,20 at7,19 at8 and15 at9 (180/900 pairs total). No completion or
+failure marker is present yet. No result-dependent decisions were made.
+
+Provider resource snapshot `runs/pentobi-ladder-billing-report-20261026T1306.json`
+attributes **$0.22369045** so far to this benchmark, with CPU, RAM and network
+egress only; metering can lag. The workspace summary remains $0 billed after
+credits/allowances. The conservative $3.43666 reservation is unchanged.
+Use the installed `modal billing summary` and `modal billing report` CLI
+commands for later billing checks. A browser reader timed out during this
+follow-up; the CLI checks succeeded and the remote benchmark was unaffected.
