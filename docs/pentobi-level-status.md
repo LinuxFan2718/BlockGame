@@ -78,12 +78,12 @@ remove the bounded follow-up schedule. Healthy progress needs no notification.
 
 ## Current state
 
-**Interrupted; awaiting explicit recovery approval:** app
-ap-8J7F0oIUjPAAYL4nbs591O stopped26 October10:41:58EDT after a provider
-preemption.820/900 complete opening pairs are saved and verified locally.
-The separately authorized GPU continuation is healthy. No benchmark is active;
-do not launch the prepared recovery until Dennis answers the pending question.
-The original model/configuration and all saved results remain unchanged.
+**Approved recovery running:** Dennis explicitly answered “Yes, recover the
+remaining80 pairs.” One recovery app ap-aceNu72e6upXDaPHCMAOsZ launched at
+11:17:55EDT,26 October, using the exact original image/model/engine/protocol.
+The first app ap-8J7F0oIUjPAAYL4nbs591O remains stopped after provider preemption.
+All820 earlier pairs are preserved and independently replayed locally. The
+separately authorized GPU continuation is healthy. Do not start another recovery.
 
 Source commit da7e33985269a846cad82e8a08295876ae21432a. All70 Python tests passed,
 including real parallel Pentobi games, missing-pair recovery, unchanged replayed
@@ -165,3 +165,23 @@ wrapper has not been executed. An explicit approval flag is required.
 Pending human question asks permission for this one recovery because the saved
 heartbeat explicitly prohibits automatic retries. Continue monitoring the GPU
 study while waiting; do not repeatedly notify about this unchanged interruption.
+
+### Approved recovery execution
+
+Dennis explicitly approved the prepared recovery in this chat. Executed once:
+
+```sh
+.venv-modal/bin/modal run --detach --profile linuxfan2718 cloud/modal_ladder_recovery.py --approved > runs/duo-pentobi-ladder-2579000-recovery.log 2>&1
+```
+
+App ap-aceNu72e6upXDaPHCMAOsZ is CPU-only,non-preemptible,45-minute hard timeout,
+retries0. The ledger now contains the original$3.43666 and recovery$1.32618
+reservations: **$4.76284 total**, within the original$5 ceiling. No model/replay
+or new engine source is uploaded; the only upload is the recovery wrapper.
+Executed wrapper SHA256:
+`226359451bb9b8e17f28fe036d68248965fa5800e1c0b945c8d818394d1a6270`.
+Original experimental protocol fingerprint is unchanged. The new image
+im-quaFj4Ja4cFgUL5Z867XL0 adds only the wrapper to the preserved original image.
+Prelaunch app/process checks found only the intentional GPU continuation active.
+No second recovery is authorized or affordable under the remaining reservation
+ceiling. Keep the shared follow-up until both studies' reports are finished.
