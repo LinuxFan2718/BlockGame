@@ -26,7 +26,8 @@ models and certified tic-tac-toe checkpoints are preserved.
   earned any points;100 independent opening pairs give an upper bound of2.95%.
 - The result is a performance curve against these opponents, not a calibrated
   human Elo rating. If all scores remain below50%, report below level1 for this
-  fixed agent/search setup rather than inventing an interpolated level.
+  fixed agent/search setup rather than inventing an interpolated level. Distinguish
+  point estimates from confidence intervals crossing50%.
 
 ## Runtime screen and budget
 
@@ -72,9 +73,24 @@ remove the bounded follow-up schedule. Healthy progress needs no notification.
 
 ## Current state
 
-Prepared, not yet launched. All70 Python tests passed, including real parallel Pentobi
-games, missing-pair recovery, unchanged replayed actions/scores and rejection of
-changed model/configuration. Lint/format pass. The CPU-only sweep will begin after
-the final budget/app checks. Current provider CPU/RAM rates were verified and
-saved in runs/pentobi-ladder-current-rates-20261026.json. No benchmark outcomes
-have been observed yet.
+**Running:** app ap-8J7F0oIUjPAAYL4nbs591O, started26 October08:42EDT
+(12:42UTC), detached. Exactly one app/container is active. First completed pairs
+at multiple levels and committed Volume progress were verified; the model's
+original private-Volume hash passed. No new model was uploaded and no training
+was started. Do not launch another copy.
+
+Source commit da7e33985269a846cad82e8a08295876ae21432a. All70 Python tests passed,
+including real parallel Pentobi games, missing-pair recovery, unchanged replayed
+actions/scores and rejection of changed model/configuration. Lint/format pass.
+Current provider rates were verified and saved in
+runs/pentobi-ladder-current-rates-20261026.json. Ledger reserves **$3.43666**;
+actual metering is separate. Source payload SHA256:
+`8925ebfa95687c61d5c9c21f86f23ccdabb2834c9e5d0b167596c2ee6c1a155f`.
+Runner SHA256:
+`83fdedc1aee18201f9b7f8ef5adce0a3a0dd42d4b19edb43125f890c8a796b97`.
+Exact executed source and runner are saved with the run-name/time prefix in runs/.
+
+Follow-up schedule **finish-pentobi-levels-1-9-benchmark** checks every15minutes,
+quiet during healthy progress, reports completion or an actionable failure, and
+deletes itself after the report. No new experiment follows this benchmark.
+The cloud call continues independently if this Mac sleeps or disconnects.
