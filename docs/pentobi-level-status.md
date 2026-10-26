@@ -4,6 +4,11 @@ Dennis explicitly requested testing our best model against every Pentobi level.
 This is evaluation only: no training or checkpoint selection. Earlier studies,
 models and certified tic-tac-toe checkpoints are preserved.
 
+Supporting explanation: [why-pentobi-is-stronger.md](why-pentobi-is-stronger.md)
+records what we tested against AlphaBlokus (no matches), verified Pentobi
+implementation differences and hypotheses about our current strength gap.
+It does not use partial results from this running benchmark.
+
 ## Frozen design
 
 - Model: the selected shallow CNN, 52,978 parameters, round128 of the completed
