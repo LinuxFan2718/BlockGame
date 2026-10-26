@@ -78,11 +78,12 @@ remove the bounded follow-up schedule. Healthy progress needs no notification.
 
 ## Current state
 
-**Running:** app ap-8J7F0oIUjPAAYL4nbs591O, started26 October08:42EDT
-(12:42UTC), detached. Exactly one app/container is active. First completed pairs
-at multiple levels and committed Volume progress were verified; the model's
-original private-Volume hash passed. No new model was uploaded and no training
-was started. Do not launch another copy.
+**Interrupted; awaiting explicit recovery approval:** app
+ap-8J7F0oIUjPAAYL4nbs591O stopped26 October10:41:58EDT after a provider
+preemption.820/900 complete opening pairs are saved and verified locally.
+The separately authorized GPU continuation is healthy. No benchmark is active;
+do not launch the prepared recovery until Dennis answers the pending question.
+The original model/configuration and all saved results remain unchanged.
 
 Source commit da7e33985269a846cad82e8a08295876ae21432a. All70 Python tests passed,
 including real parallel Pentobi games, missing-pair recovery, unchanged replayed
@@ -119,3 +120,48 @@ credits/allowances. The conservative $3.43666 reservation is unchanged.
 Use the installed `modal billing summary` and `modal billing report` CLI
 commands for later billing checks. A browser reader timed out during this
 follow-up; the CLI checks succeeded and the remote benchmark was unaffected.
+
+### 10:50EDT interruption audit and concrete recovery proposal
+
+Modal preempted the CPU container shortly after90 pairs completed at most levels.
+Its infrastructure restarted the function with its original resume=false input,
+despite retries=0; our existing-directory guard then stopped the restart. This
+was not a game-legality or score mismatch. Provider documentation confirms
+preemption restarts are automatic and CPU functions can opt out at3x CPU/RAM
+price: https://modal.com/docs/guide/preemption. No agent-initiated retry has run.
+
+The stopped app has zero tasks; only the separate GPU study remains active.
+Committed pair counts:92 at each level1–7,91 at8 and85 at9, totaling820 pairs
+(1,640 games);80 pairs remain. All saved fingerprints, seats and seeds passed
+local verification. Frozen model hash is unchanged. Do not report these partial
+scores as the completed benchmark or discard any losses.
+All1,640 saved games were also replayed through the local Rust engine: every
+move was legal, opening prefixes matched and terminal scores/margins agreed.
+
+Downloaded tree: runs/duo-pentobi-ladder-interrupted-20261026T1450/.
+Manifest: interruption-verified.json in that directory. Backup:
+.backups/pentobi-ladder-interrupted-20261026T1450.tar.gz, SHA256
+`488fdfe6b7a03309d4a3c3acebaa7adcb9a701ec4994c9ef2fbf53d46c6adae6`.
+Original protocol fingerprint:
+`6f9db97f61307eb281b99ae7505364701316ee76abf4ea90650654063479fd3c`.
+Original provider metering snapshot attributes$1.13421073 to the interrupted
+app, subject to lag. Resource reservations remain$3.43666 until approval.
+
+Prepared cloud/modal_ladder_recovery.py reuses the exact original built image
+im-uHIEZ1NXBeX8O5FJeGIZqA, preserving the installed binary and Python/Rust code.
+Only a new orchestration wrapper would be uploaded; no model/replay is uploaded.
+It verifies the frozen protocol and resumes only missing whole pairs, with the
+same8 workers/model/seeds/settings and exact original binary hash enforced by
+the existing run() validator. It refuses active duplicates and completed runs.
+
+Proposal: one45-minute non-preemptible CPU function, no GPU,retries0,8 cores24GiB.
+Conservative additional reservation including90 seconds startup is$1.32618;
+combined reservations$4.76284 stay below the original$5 phase ceiling. The3x
+CPU/RAM pricing avoids repeating this particular infrastructure interruption.
+Lint, formatting and Python compilation passed; existing interrupted-pair resume
+tests already cover validation and missing-pair recovery. This new provider
+wrapper has not been executed. An explicit approval flag is required.
+
+Pending human question asks permission for this one recovery because the saved
+heartbeat explicitly prohibits automatic retries. Continue monitoring the GPU
+study while waiting; do not repeatedly notify about this unchanged interruption.

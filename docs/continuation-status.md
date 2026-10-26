@@ -153,3 +153,26 @@ the main arms differ only in full-search budget and soft runtime cap.
 Launch payload/ledger/docs backup:
 .backups/continuation-launch-20261026T133251Z.tar.gz, SHA256
 `989c3083815bc135baf880460f25b92224d9fccfb009f82628cc9e616126cfb0`.
+
+### 09:50EDT health check and completed search diagnostics
+
+Both intentional apps remain healthy with one container/client each. Standard256
+has completed at least15 rounds (3,840 additional games), with finite losses;
+strong1024 has not started because the arms run serially. The Pentobi benchmark
+has passed50 pairs at levels1–8 and40 at9. No reserved continuation test has
+been run. Workspace metering is$11.97137, covered by credits; accounting can lag.
+
+The two prespecified frozen-parent diagnostics completed on24 opening pairs
+(48 games each), seed2581000, GPU bfloat16. Each side uses the same network;
+only playing search differs:
+
+| Parent search vs parent search128 | W/D/L | Score | Nominal paired95% interval | Evaluation seconds |
+| --- | ---: | ---: | ---: | ---: |
+| 512 simulations | 35/0/13 | 72.92% | 62.50%–83.33% | 73.74 |
+| 2,048 simulations | 44/2/2 | 93.75% | 87.50%–98.96% | 230.98 |
+
+This supports a playing-search benefit against the same policy at128 simulations.
+It does not measure improvement against Pentobi or establish that training with
+more search will improve the network. No protocol, selection rule or test budget
+was changed in response. Local records:
+runs/continuation-diagnostic-search{512,2048}-20261026.json.
