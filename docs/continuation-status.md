@@ -103,7 +103,7 @@ reservation. The phase cap does not permit one.
 
 ## Execution and follow-up
 
-Prepared command (execute once after validation):
+Executed once after validation; do not repeat:
 
 ```sh
 .venv-modal/bin/modal run --detach --profile linuxfan2718 cloud/modal_continuation.py > runs/duo-continuation-865.log 2>&1
@@ -120,3 +120,36 @@ plot and paired intervals, back up new artifacts and commit validated code/docs
 locally. Preserve the existing benchmark's separate result/report obligations.
 Stop the shared follow-up after both bounded jobs and reports finish. Do not
 automatically begin a larger training series or release the$50 reserve.
+
+### Launch audit
+
+Running detached: **ap-DQEFQZzvb7k0kP8eAjXRWz**, app
+blokus-controlled-continuation. Ledger entry26 October09:32EDT reserves
+$22.74661. The only other active app is the intentional CPU benchmark. No new
+model or replay was uploaded. The private parent model/state hashes passed
+before artifact creation. Source commit:
+`1ebb18e97014dafee86d11ed6bc5ebbc2b9e5018`.
+Exact uploaded payload SHA256:
+`84182ab9d14994a80bbcd90b6765bd9f55a40aad7faecc61d5797821a919061d`.
+Runner SHA256:
+`9636c0be374901f3587015d7e0278db931e1b61a84230bb6a0c79616a5c9cc74`.
+
+All71 Python tests passed (7 existing compatibility/recommendation warnings),
+including inherited optimizer/replay checks, unchanged parent files and exact
+interrupted/recovered fork training. Lint/format and diff checks passed.
+Log: runs/continuation-regression-20261026.log. Prelaunch source/docs backup:
+.backups/continuation-start-20261026T133030Z.tar.gz, SHA256
+`66313b13a4e2529ffd5f05b30ba9a765d222a4597e01fb17086e865f52686d0c`.
+
+The existing15-minute heartbeat finish-pentobi-levels-1-9-benchmark was updated
+to monitor both bounded studies and their separate reporting obligations. It
+must not delete itself merely because the CPU benchmark finishes first.
+
+Actual CUDA/bfloat16 smoke passed:16 games,2 rounds,finite losses and a successful
+atomic-checkpoint recovery between rounds. These are functionality checks;
+its tiny validation result is not strength evidence and its weights are not
+promoted. Downloaded completion and remote protocol were checked locally;
+the main arms differ only in full-search budget and soft runtime cap.
+Launch payload/ledger/docs backup:
+.backups/continuation-launch-20261026T133251Z.tar.gz, SHA256
+`989c3083815bc135baf880460f25b92224d9fccfb009f82628cc9e616126cfb0`.
