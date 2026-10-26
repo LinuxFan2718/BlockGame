@@ -24,9 +24,12 @@ The [AlphaBlokus source study](docs/alphablokus-study.md) explains its published
 residual CNN, four-player search, self-play targets and GPU batching.
 A shorter [saved explanation](docs/alphablokus-explanation.md) follows the learning
 loop. The [deep CNN overnight study](docs/deep-self-play.md) and
-[current status](docs/deep-status.md) cover the new cold-start comparison.
-To play with search: `.venv/bin/blokus-rl duo-play
-runs/duo-frontier-training-342/best.pt --simulations 128`. Training entry point:
+[completed results and plot](docs/deep-results.md) cover two randomly initialized
+CNNs trained through batched self-play. The smaller CNN won this comparison;
+Pentobi level 1 remains stronger. Audit details are in [deep status](docs/deep-status.md).
+To play the strongest candidate from this study with search:
+`.venv/bin/blokus-rl duo-play runs/duo-deep-local-764/conv.pt --simulations 128`.
+Earlier checkpoints remain preserved. Training entry point:
 `.venv/bin/python -m blokus_rl.duo_az --help`.
 
 ```sh

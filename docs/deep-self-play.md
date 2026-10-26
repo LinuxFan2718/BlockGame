@@ -6,6 +6,11 @@ helpful, and continue overnight. Existing certified tic-tac-toe and all earlier
 Blokus checkpoints are preserved. This supersedes the completed-study stop for
 new experiments, while leaving all completed earlier runs untouched.
 
+**Completed:** see [results and plot](deep-results.md). Both models finished their
+full 32,768-game budgets; the smaller CNN was stronger in the held-out comparisons.
+This protocol is preserved as the record of the design, not an instruction to
+launch another run. The rolling completion audit is in [deep-status.md](deep-status.md).
+
 ## Hypothesis and design
 
 A10-block64-channel residual CNN, inventory conditioning and shared GPU inference
@@ -117,3 +122,13 @@ Based solely on throughput and successful recovery, before main training starts,
 the planned upper limit was increased from64 to128 rounds per architecture.
 The2.5hour time limit is retained; shallow control uses the deep run's actual
 completed round count. Freeze runs/deep-study-config.json before launch.
+
+## Interpretation limits clarified after completion
+
+The deep/shallow comparison changes an architecture bundle, including depth,
+width, normalization, coordinate inputs, inventory modulation at different layers
+and tanh versus linear value outputs. Both models receive remaining-piece
+inventories. Equal game counts and fixed training rules need not produce exactly
+equal numbers of recorded positions, simulations or gradient examples, because
+their game trajectories differ. Report those actual counts and elapsed time.
+Neither a gain nor a failure isolates depth as its cause.

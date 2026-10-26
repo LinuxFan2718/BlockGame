@@ -1,6 +1,7 @@
 # Search and bounded Modal study complete — 25 October 2026
 
-New user-authorized overnight phase: [deep self-play status](deep-status.md).
+Subsequent overnight phase also complete: [deep self-play results](deep-results.md)
+and [completion audit](deep-status.md).
 The completed experiments below remain frozen; do not restart them.
 
 Read `docs/search-results.md` for the compact results and plot,
