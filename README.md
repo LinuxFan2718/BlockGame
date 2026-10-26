@@ -27,6 +27,12 @@ loop. The [deep CNN overnight study](docs/deep-self-play.md) and
 [completed results and plot](docs/deep-results.md) cover two randomly initialized
 CNNs trained through batched self-play. The smaller CNN won this comparison;
 Pentobi level 1 remains stronger. Audit details are in [deep status](docs/deep-status.md).
+
+The [completed Pentobi levels 1–9 benchmark](docs/pentobi-level-results.md)
+tests that frozen small CNN with 128 search simulations over 1,800 games.
+It scored 27.5% against level 1 and remains below that level under this protocol.
+A [controlled continuation study](docs/continuation-status.md) is running to
+compare additional self-play with standard versus stronger training search.
 To play the strongest candidate from this study with search:
 `.venv/bin/blokus-rl duo-play runs/duo-deep-local-764/conv.pt --simulations 128`.
 Earlier checkpoints remain preserved. Training entry point:

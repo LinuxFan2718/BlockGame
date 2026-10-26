@@ -176,3 +176,35 @@ It does not measure improvement against Pentobi or establish that training with
 more search will improve the network. No protocol, selection rule or test budget
 was changed in response. Local records:
 runs/continuation-diagnostic-search{512,2048}-20261026.json.
+
+### 11:35EDT stage transition
+
+Standard256 finished all128 rounds/32,768 additional games in6,326.93 seconds
+(1.76 hours), ending at its round limit. Its best validation score against the
+parent is77.34%; this selected-on-validation result is not held-out evidence.
+Strong1024 has started from the same preserved parent state and has passed five
+rounds with finite losses. No continuation held-out comparison has started yet.
+Local first-arm completion record: runs/continuation-standard-completed-20261026.json.
+
+The explicitly approved CPU recovery is progressing:100/100 pairs at levels1–8,
+95/100 at9 in its latest committed status. It emits an unsupported-NNPACK
+hardware warning while PyTorch continues on a fallback path; no traceback or
+legality/score failure is present. Preserve the original float32 protocol and
+report the cross-host/backend limitation in the eventual benchmark report.
+Both active jobs remain within their reserved limits; workspace metering is
+$17.67137 so far and$0 billed after credits/allowances, subject to accounting lag.
+
+### 11:50EDT benchmark completion
+
+The approved CPU recovery finished all 900 pairs / 1,800 games and stopped.
+Both benchmark apps have zero tasks. Results and verified plot are in
+[pentobi-level-results.md](pentobi-level-results.md): the frozen parent scored
+27.50% against level 1 and remains below it under the paired opening protocol.
+All original 820 pair files are unchanged and all 1,800 games replayed correctly.
+Benchmark metering totals $1.82439453, distinct from $4.76284 reservations.
+
+Only the GPU continuation remains active. Strong1024 is progressing with finite
+losses; its held-out comparisons have not started. The completed level sweep
+does not change this study's configuration, checkpoint selection or test budget.
+The shared follow-up now monitors only the remaining GPU study and must not
+repeat the completed benchmark's notification or launch more level games.

@@ -78,12 +78,12 @@ remove the bounded follow-up schedule. Healthy progress needs no notification.
 
 ## Current state
 
-**Approved recovery running:** Dennis explicitly answered “Yes, recover the
-remaining80 pairs.” One recovery app ap-aceNu72e6upXDaPHCMAOsZ launched at
-11:17:55EDT,26 October, using the exact original image/model/engine/protocol.
-The first app ap-8J7F0oIUjPAAYL4nbs591O remains stopped after provider preemption.
-All820 earlier pairs are preserved and independently replayed locally. The
-separately authorized GPU continuation is healthy. Do not start another recovery.
+**Completed and verified:** all 900 opening pairs / 1,800 games finished.
+The original and approved recovery apps are stopped with zero tasks. All 820
+earlier pair files are unchanged; all 1,800 games and final margins were replayed
+locally and all search budgets checked. See [results, table and plot](pentobi-level-results.md).
+The separate GPU continuation remains active; retain the shared follow-up for
+that study. No further games in this level benchmark are authorized or needed.
 
 Source commit da7e33985269a846cad82e8a08295876ae21432a. All70 Python tests passed,
 including real parallel Pentobi games, missing-pair recovery, unchanged replayed
@@ -185,3 +185,42 @@ im-quaFj4Ja4cFgUL5Z867XL0 adds only the wrapper to the preserved original image.
 Prelaunch app/process checks found only the intentional GPU continuation active.
 No second recovery is authorized or affordable under the remaining reservation
 ceiling. Keep the shared follow-up until both studies' reports are finished.
+
+### Completion audit — 26 October, 11:50EDT
+
+Both completed.json and hardware.json were retrieved; recovery app stopped at
+11:42:12EDT, with zero tasks. The final log-tail timeout followed a successful
+return and is not a missing-game failure. Fresh final download directory:
+runs/duo-pentobi-ladder-final-20261026T1550/, containing the complete run,
+download-sha256.json and verification.json. All 900 pair fingerprints, indices,
+seats, seeds and opening prefixes verified. Every original 820 pair file matched
+its interruption manifest exactly. All 1,800 games were independently replayed
+and scores/margins matched. Actor counters total 3,829,248 simulations over
+29,916 searched decisions, exactly 128 each, with 2,939,535 neural evaluations.
+The existing certified/checkpoint manifest also matched all three entries.
+
+Scores by Pentobi level: 27.50%,15.75%,7.75%,1.25%,0.75%,0%,0%,0%,0%.
+Level 1 paired nominal95% interval:22.25%–33.00%. Levels6–9 report a conservative
+one-sided paired upper bound of2.95%, rather than a misleading[0,0] interval.
+This frozen model remains below level1 under the declared opening protocol.
+The continuation agents are not evaluated by these results.
+
+Provider per-app metering snapshot: original$1.13421073 plus recovery$0.69018380,
+total **$1.82439453**, covered by existing credits/allowances; accounting can lag.
+Conservative reservations remain$4.76284 under$5. App lifetimes were2.015h
+and0.406h (2.421h combined,excluding approval idle time). Recovery function
+duration1413.80s covers only the second call. The mixed-host CPUfloat32 recovery
+used a PyTorch fallback for unsupported NNPACK; the final report records this
+limitation and distinguishes the fresh book from earlier GPU-bfloat16 tests.
+
+The reproducible report entrypoint python/blokus_rl/duo_pentobi_report.py
+independently verifies every saved game, budget and summary before rendering.
+No further training or benchmark was launched to produce this report.
+
+Final artifacts/report/code/provider snapshots backed up locally:
+.backups/pentobi-ladder-final-20261026T1550.tar.gz (1,017,169 bytes), SHA256
+`22681d51c45a0d338fa1be793aed195538bdc1974b58298e95a2a42146463be6`.
+The reproducible report validator, lint/format and Markdown link/diff checks
+passed. The plot was visually inspected; PNG and SVG are preserved. The shared
+heartbeat was narrowed to the still-running GPU continuation and will delete
+itself after that study's final report.
