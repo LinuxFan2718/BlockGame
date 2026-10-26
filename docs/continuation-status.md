@@ -208,3 +208,91 @@ losses; its held-out comparisons have not started. The completed level sweep
 does not change this study's configuration, checkpoint selection or test budget.
 The shared follow-up now monitors only the remaining GPU study and must not
 repeat the completed benchmark's notification or launch more level games.
+
+### 15:50EDT training complete; selected checkpoints frozen
+
+Both branches finished all 128 rounds / 32,768 additional games at their round
+limits. Standard256 took 6,326.93 seconds; strong1024 took 15,953.60 seconds
+(4.43 hours), within its 5-hour soft limit. Neither arm was truncated, although
+their actual simulation and gradient budgets still require the final audit.
+
+The job froze the selected policies and wrote heldout-protocol.json before
+starting the reserved evaluations. Frozen SHA256 values are:
+
+- standard256: `4cbeb255cb5688a6b931ac4ac6964f21e3c6430be2e6dd558e6d7c9a14d43b19`
+- strong1024: `95569be7c179180c12681255dbcee9884f465e713f418e958a508907beb4d512`
+
+The unchanged parent hash, seed 2589000, 100 opening pairs, 128-simulation playing
+budget and bfloat16 precision match the reserved protocol. Local completion and
+freeze records are in runs/continuation-freeze-audit-20261026T1950/. These are
+stage records, not final test evidence. The existing app remains active with
+one task; do not start a separate evaluation or training process.
+
+### 16:07EDT completed and downloaded; final audit
+
+The function committed finished.json at 16:06EDT, and app
+ap-DQEFQZzvb7k0kP8eAjXRWz stopped at 16:06:32 with zero tasks. All 12 reserved
+held-out cases completed (2,400 games); no preemption, retry, training cap
+mismatch or scientific-protocol change occurred. The final CLI log-reader
+timeout followed successful remote completion and is not a study failure.
+The discarded CUDA smoke contributed 16 separate functionality-check games.
+
+The complete download is
+runs/duo-continuation-final-20261026T2007/duo-continuation-865:
+74 files, 1,194,949,217 bytes. The report generator independently verifies all
+paired summaries and all 1,200 saved external action traces, frozen/initial model
+hashes, final atomic states, inherited+new AdamW steps, original parent hashes,
+selection against separate validation and preserved certified checkpoints.
+Derived verification and every downloaded file hash are saved alongside the run.
+
+The primary strong1024 versus standard256 comparison, both playing search128,
+scored 60.25% (116/9/75 W/D/L; nominal paired 95% interval 54.50%–66.00%), meeting
+the declared lower-bound-above 50% criterion. Raw strong versus raw standard
+scored 68.25% (62.00%–74.25%). These are held-out results, not validation scores.
+Against Pentobi 31.0 level 1 on the same fresh book, parent/standard/strong
+search128 scored 30.25%/50.75%/62.50%; raw scored 10.50%/20.25%/36.25%.
+Strong search128 had 121/8/71 W/D/L, interval 55.75%–69.00%, and a 32.25 percentage
+point improvement over the parent (paired interval +23.00 to +41.25 points).
+The complete tables, paired differences, methods and plot are in
+[continuation-results.md](continuation-results.md).
+
+Each arm generated 32,768 additional games. Actual standard/strong training used
+87,904,544/263,393,152 simulations, 228,636/228,639 recorded full-search roots,
+2,739/2,748 gradient updates and 701,184/703,488 gradient examples. The selected
+strong model is round 112 (28,672 additional games), while standard selected
+round 128; strong's last 16 rounds were generated but not selected. Equal generated
+games do not imply equal compute or selected-checkpoint experience. Neither the
+single lineage/seed nor beating level 1 establishes reproducibility or a Blokus
+frontier result. The new agent has not played higher levels or AlphaBlokus.
+
+Saved provider metering is $16.57150713 for the continuation app, versus its
+$22.74661 reservation and $25 ceiling. Workspace metering at that snapshot is
+$29.14137374, $0 billed after credits/allowances; accounting may lag. Approximately
+$100.86 of the original $130 allowance remains, and the $50 reserve stays
+uncommitted. All paid compute is stopped. No further training or benchmark is
+authorized by this completed protocol; proposed next work remains a proposal.
+
+Private Modal parent weights and optimizer/replay were also downloaded directly
+and hashed after completion; both match their original hashes. An earlier
+read-only check piped Modal CLI stdout to shasum, which included the CLI
+completion message and therefore produced invalid stream hashes. Direct file
+hashes resolved this audit-tool issue; no parent changed. The note and correct
+hashes are retained in runs/continuation-remote-preservation-20261026.json and
+runs/continuation-stdout-hash-check-note-20261026.md. Exact executed payload and
+runner hashes were checked against the launch ledger as well.
+
+Final local backup: .backups/continuation-final-20261026T2015.tar.gz,
+248,673,712 bytes, SHA256
+`eb763d26b0a9292dd5ec158e0da1457f5e5bca3af8f1f4666798b7ec7c05f8c6`.
+It contains102 files /1,195,482,612 uncompressed bytes: the complete new run,
+all checkpoints and atomic states, derived audits, exact execution payload,
+cost records, report/plot and relevant code/docs. Every archived member was
+read back and its SHA256 compared with the original; the sidecar JSON records
+the full manifest. This is a second local copy, not an off-site backup.
+
+The final report/audit and Ruff formatting/lint plus git diff checks pass.
+No engine, training or checkpoint change followed the freeze. All original
+certified tic-tac-toe, earlier Blokus and new selected policies remain preserved.
+The final app snapshot confirms stopped/zero tasks. The completed study now
+requires only local commit and removal of the shared follow-up schedule; no
+new paid work is queued.

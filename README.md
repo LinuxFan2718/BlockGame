@@ -25,16 +25,20 @@ residual CNN, four-player search, self-play targets and GPU batching.
 A shorter [saved explanation](docs/alphablokus-explanation.md) follows the learning
 loop. The [deep CNN overnight study](docs/deep-self-play.md) and
 [completed results and plot](docs/deep-results.md) cover two randomly initialized
-CNNs trained through batched self-play. The smaller CNN won this comparison;
-Pentobi level 1 remains stronger. Audit details are in [deep status](docs/deep-status.md).
+CNNs trained through batched self-play. The smaller CNN won that comparison;
+Pentobi level 1 beat both earlier models. Audit details are in [deep status](docs/deep-status.md).
 
 The [completed Pentobi levels 1–9 benchmark](docs/pentobi-level-results.md)
 tests that frozen small CNN with 128 search simulations over 1,800 games.
 It scored 27.5% against level 1 and remains below that level under this protocol.
-A [controlled continuation study](docs/continuation-status.md) is running to
-compare additional self-play with standard versus stronger training search.
-To play the strongest candidate from this study with search:
-`.venv/bin/blokus-rl duo-play runs/duo-deep-local-764/conv.pt --simulations 128`.
+The [completed controlled continuation](docs/continuation-results.md) improved
+the same small CNN through additional self-play. Stronger training search won
+the primary comparison and its selected model scored 62.5% against Pentobi level 1
+at 128 playing simulations, over 200 fresh held-out games. Higher Pentobi levels
+have not yet been tested against this new model. See the [protocol](docs/continuation-status.md)
+for the fixed settings, costs and limitations.
+To play the strongest selected agent with search:
+`.venv/bin/blokus-rl duo-play runs/duo-continuation-final-20261026T2007/duo-continuation-865/frozen-strong1024.pt --simulations 128`.
 Earlier checkpoints remain preserved. Training entry point:
 `.venv/bin/python -m blokus_rl.duo_az --help`.
 
