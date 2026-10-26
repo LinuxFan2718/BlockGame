@@ -54,3 +54,24 @@ produce a compact score/runtime plot and results below, inspect actual costs,
 back up all new artifacts and commit validated code/docs locally. Preserve every
 earlier model. Remove any follow-up after final reporting; no further automatic
 training or benchmark is part of this authorization.
+
+## Launch and current state
+
+Launched once at 17:23 EDT: app ap-UrnuIYPY5ezlfrtdOYyGsy, one L40S container.
+Source commit c0bb61ad4fb643006be2414ea8c2d9af784a17d3; exact executed runner
+SHA256 62c485d843e21038d51834a6a080f5521cc3764e0f4a7e8dd7e1adf96042fe72.
+The launcher saved the runner and billing snapshot beside its single ledger
+entry. Active apps/processes were checked first; earlier runs are stopped.
+Only this new runner was uploaded. The immutable evaluator and private model
+hash checks passed, and search 128 is saving paired games normally.
+
+Both targeted evaluator tests passed (1.99 seconds), including a separate real
+Pentobi match. New wrapper lint/format/compilation and diff checks passed.
+The prepared local audit/report entry point is
+python/blokus_rl/duo_search_sweep_report.py. It requires finished artifacts and a
+stopped app; it never launches games. Do not interpret an interim arm as the
+completed sweep or change the reserved budget/book in response.
+
+The quiet 5-minute follow-up finish-frozen-blokus-search-sweep monitors only this
+bounded study, finishes its report/backup and deletes itself afterward. It must
+not start new training, duplicate evaluation or notify intermediate scores.
