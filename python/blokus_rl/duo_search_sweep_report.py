@@ -221,7 +221,7 @@ def render(args):
     lines = [
         "## Completed results",
         "",
-        f"The prespecified 2,048-minus-128 score difference was **{difference['score_difference'] * 100:+.2f} percentage points**, with a nominal paired95% interval of **{low * 100:+.2f} to {high * 100:+.2f} points**. "
+        f"The prespecified 2,048-minus-128 score difference was **{difference['score_difference'] * 100:+.2f} percentage points**, with a nominal paired 95% interval of **{low * 100:+.2f} to {high * 100:+.2f} points**. "
         + (
             "The interval is above zero, supporting a benefit from extra playing search for this frozen agent."
             if supported
@@ -230,7 +230,7 @@ def render(args):
         "",
         "![Score and runtime](assets/playing-search-sweep.png)",
         "",
-        "| Simulations/move | W/D/L | Win rate | Score | Nominal paired95% interval | Mean margin | Mean game seconds |",
+        "| Simulations/move | W/D/L | Win rate | Score | Nominal paired 95% interval | Mean margin | Mean game seconds |",
         "| --- | ---: | ---: | ---: | ---: | ---: | ---: |",
     ]
     for budget in BUDGETS:
@@ -241,9 +241,11 @@ def render(args):
         )
     lines += [
         "",
-        "Score counts draws as half. Each budget completed200 games on the same100 fresh openings. Per-game time includes both agents and protocol overhead; it is not GPU-only or our-agent-only latency. The prior31.5% level2 score used another book, so the new128 baseline is not a controlled change in model strength.",
+        "Score counts draws as half. Each budget completed 200 games on the same 100 fresh openings. Per-game time includes both agents and protocol overhead; it is not GPU-only or our-agent-only latency. The prior 31.5% level 2 score used another book, so the new 128 baseline is not a controlled change in model strength.",
         "",
-        "| Paired score difference | Difference | Nominal95% interval |",
+        "The 512- and 2,048-simulation agents both have absolute-score intervals above 50% against Pentobi level 2 here. The network did not learn during this experiment: additional planning alone changed the results. This supports useful planning headroom for the current network, but does not establish that further training will reproduce the same gain at a smaller playing budget.",
+        "",
+        "| Paired score difference | Difference | Nominal 95% interval |",
         "| --- | ---: | ---: |",
     ]
     for label, row in audit["paired_differences"].items():
@@ -255,7 +257,9 @@ def render(args):
         "",
         "### Actual execution and verification",
         "",
-        f"One {hardware['gpu']}, two capped cores,8GiB RAM; PyTorch{hardware['torch']}, CUDA{hardware['cuda']}, bfloat16. Function runtime{hardware['seconds']:.2f} seconds; app lifetime{lifetime:.0f} seconds. Provider metering at the saved snapshot: **${cost:.8f}**, versus the$4.269915 conservative reservation and$5 phase cap. Accounting can lag. All compute is stopped and the$50 reserve stays uncommitted.",
+        f"One {hardware['gpu']}, two capped cores, 8 GiB RAM; PyTorch {hardware['torch']}, CUDA {hardware['cuda']}, bfloat16. Function runtime {hardware['seconds']:.2f} seconds; app lifetime {lifetime:.0f} seconds. Provider metering at the saved snapshot: **${cost:.8f}**, versus the $4.269915 conservative reservation and $5 phase cap. Accounting can lag. All compute is stopped and the $50 reserve stays uncommitted.",
+        "",
+        "No preemption, retry, scientific-protocol change or time-limit truncation occurred. All three prespecified budgets finished, regardless of interim scores. Only the prepared runner was uploaded; the model remained in its existing private Volume and its source hash also passed the runner's end-of-job check.",
         "",
         "| Budget | Actual searched decisions | Actual simulations | Neural positions | Arm wall seconds |",
         "| --- | ---: | ---: | ---: | ---: |",
@@ -266,7 +270,7 @@ def render(args):
         )
     lines += [
         "",
-        "All600 saved games were independently replayed through Rust: legal moves, scores/margins, opening prefixes, seats/seeds and exact actor simulation counts matched. Frozen model, immutable evaluator, Pentobi binary and executed runner hashes passed. Every pair summary and paired interval was recomputed. Certified earlier checkpoints remain unchanged. No new training or model selection occurred. Search can change trajectories and game length; simulation totals therefore need not scale exactly with the nominal budget. Nominal paired intervals exclude training-seed, lineage and hardware uncertainty, and secondary tests are not multiplicity adjusted. This evaluates thinking time for one fixed model against one fixed opponent level, not training improvement or the Blokus frontier.",
+        "All 600 saved games were independently replayed through Rust: legal moves, scores/margins, opening prefixes, seats/seeds and exact actor simulation counts matched. Frozen model, immutable evaluator, Pentobi binary and executed runner hashes passed. Every pair summary and paired interval was recomputed. Certified earlier checkpoints remain unchanged. No new training or model selection occurred. Search can change trajectories and game length; simulation totals therefore need not scale exactly with the nominal budget. Nominal paired intervals exclude training-seed, lineage and hardware uncertainty, and secondary tests are not multiplicity adjusted. This evaluates thinking time for one fixed model against one fixed opponent level, not training improvement or the Blokus frontier.",
         "",
         f"Complete artifacts: `{args.run}`. Derived audit and all downloaded hashes: `{args.run.parent / 'verification.json'}` and `download-sha256.json`. Reproduce locally with `python -m blokus_rl.duo_search_sweep_report --run <run> --apps <stopped-apps.json> --billing <provider-report.json> --out docs/playing-search-sweep.md`; no games are launched by the reporter.",
         "",

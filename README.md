@@ -36,9 +36,14 @@ the same small CNN through additional self-play. Stronger training search won
 the primary comparison and its selected model scored 62.5% against Pentobi level 1
 at 128 playing simulations, over 200 fresh held-out games. The subsequent
 [sequential test stopped at level 2, scoring 31.5%](docs/strong-pentobi-levels.md).
+The [frozen-model search sweep](docs/playing-search-sweep.md) then scored
+42.0%, 62.75% and 75.0% against level 2 at 128, 512 and 2,048 simulations,
+respectively, using the same fresh openings across budgets. Extra planning
+improved strength without changing the network weights.
 See the [protocol](docs/continuation-status.md) for settings, costs and limitations.
-To play the strongest selected agent with search:
+To play the selected agent at the fast 128-simulation budget:
 `.venv/bin/blokus-rl duo-play runs/duo-continuation-final-20261026T2007/duo-continuation-865/frozen-strong1024.pt --simulations 128`.
+Use `--simulations 2048` for the stronger playing budget from the sweep.
 Earlier checkpoints remain preserved. Training entry point:
 `.venv/bin/python -m blokus_rl.duo_az --help`.
 
