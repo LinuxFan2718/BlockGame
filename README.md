@@ -34,9 +34,9 @@ It scored 27.5% against level 1 and remains below that level under this protocol
 The [completed controlled continuation](docs/continuation-results.md) improved
 the same small CNN through additional self-play. Stronger training search won
 the primary comparison and its selected model scored 62.5% against Pentobi level 1
-at 128 playing simulations, over 200 fresh held-out games. Higher Pentobi levels
-have not yet been tested against this new model. See the [protocol](docs/continuation-status.md)
-for the fixed settings, costs and limitations.
+at 128 playing simulations, over 200 fresh held-out games. The subsequent
+[sequential test stopped at level 2, scoring 31.5%](docs/strong-pentobi-levels.md).
+See the [protocol](docs/continuation-status.md) for settings, costs and limitations.
 To play the strongest selected agent with search:
 `.venv/bin/blokus-rl duo-play runs/duo-continuation-final-20261026T2007/duo-continuation-865/frozen-strong1024.pt --simulations 128`.
 Earlier checkpoints remain preserved. Training entry point:
