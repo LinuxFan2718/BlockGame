@@ -1,47 +1,45 @@
-# How AlphaBlokus works
+# AlphaBlokus: the CNN, search and self-play loop
 
-AlphaBlokus combines a **residual convolutional neural network (CNN)**,
-**Monte Carlo tree search (MCTS)** and **self-play training**, following the
-broad AlphaZero approach. It plays four-player Classic Blokus on20×20 boards.
-The public source and published model graph were checked; its playing strength
-and reported training cost have not been independently reproduced here.
+**Yes—AlphaBlokus uses both a CNN and search, connected through an AlphaZero-style self-play loop.** I checked its source code and the published model’s ONNX graph. It targets **four-player Blokus on a20×20 board**.
+
+The overall loop is:
 
 ```mermaid
 flowchart LR
-    N["CNN suggests moves and estimates outcomes"] --> S["Search examines continuations"]
-    S --> G["Self-play creates moves and final results"]
-    G --> T["PyTorch trains the CNN"]
+    N["CNN suggests moves<br/>and estimates outcomes"] --> S["Search examines<br/>possible continuations"]
+    S --> G["Self-play produces<br/>moves and final results"]
+    G --> T["PyTorch trains<br/>the CNN"]
     T --> N
 ```
 
-The CNN receives four numerical grids, one for each player's occupied squares,
-and adds horizontal/vertical coordinate grids. Boards rotate and player channels
-are reordered to the current player's perspective. The published model has64
-feature channels and10 residual blocks, each with two3×3 convolutions. A block
-adds a learned refinement back to its input, helping deeper networks train.
+Its CNN receives the board as **four numerical grids**, one for each player’s occupied squares. It adds two coordinate grids indicating horizontal and vertical position. The board is rotated and the player channels reordered so the network always sees the position from the current player’s perspective.
 
-A separate4×21 inventory input says which pieces each player still has. A small
-dense network turns that into feature-map scales and offsets, called FiLM. It
-lets a board arrangement be interpreted differently depending on available pieces.
+The published network has **64 feature channels and10 residual blocks**, each containing two3×3 convolutions. A residual block learns a refinement and adds it back to its input: roughly, `output = input + learned_refinement`. These “skip connections” help deeper networks train. For comparison, our experimental CNN currently has four convolutions in its main body. [Network implementation](https://github.com/ShivamSarodia/AlphaBlokus/blob/b4470ef9667e7c6f000a0542bb3aaa4d5cce1292/python/src/alphablokus/res_net_film.py).
 
-The **policy head** outputs91×20×20 placement scores; Rust filters illegal moves.
-The **value head** outputs four outcome estimates; tied winners share the credit.
+It also receives **which pieces each player still has**, as4×21 indicators. A small dense network converts these into adjustments to the CNN’s feature maps. This technique is called **FiLM**. It lets the network interpret the same board arrangement differently depending on the remaining pieces—for example, whether a useful shape could still fit into a gap. [Model configuration](https://github.com/ShivamSarodia/AlphaBlokus/blob/b4470ef9667e7c6f000a0542bb3aaa4d5cce1292/configs/train_live/vast_film.toml).
 
-MCTS balances estimated value with exploration, applies moves in copied games,
-asks the CNN about new positions, and backs up values and visit counts. The
-checked playing configuration uses2,000 simulations per move. A simulation
-usually stops at a neural evaluation rather than finishing a random game.
+The network then splits into two **heads**:
 
-The policy learns the search visit distribution; the value learns the eventual
-game outcome. Updated networks play the next games. The checked training setup
-runs1,024 concurrent games, GPU batches128, cheap200-simulation searches on80%
-of moves and full1,000-simulation searches on20%. Only full searches are saved
-as training examples. Pentobi supplies a benchmark, not demonstrations in that
-published self-play configuration.
+| Head | What it produces |
+|---|---|
+| **Policy** | Scores for oriented piece placements: a91×20×20 grid. Rust determines legality and filters the choices. |
+| **Value** | Four outcome estimates, one per player. Tied winners share the winning credit. |
 
-For our project, the useful lessons are a deeper CNN, enough concurrent CPU games
-to feed GPU batches, and much more self-play data. Our Duo experiment adapts those
-ideas to14×14 boards, two players and the existing verified Rust rules.
+I verified those input/output dimensions against the [published model graph](https://github.com/ShivamSarodia/AlphaBlokus/blob/b4470ef9667e7c6f000a0542bb3aaa4d5cce1292/static/browser/026025784.onnx).
 
-For exact source links, model metadata, implementation details and limitations,
-see [the source study](alphablokus-study.md).
+**Search turns those initial guesses into a more considered move.** Its Monte Carlo tree search repeatedly:
+
+1. Chooses a promising branch, balancing estimated value with exploration.
+2. Applies moves in copies of the Rust game.
+3. Asks the CNN to evaluate a newly reached position, or uses the actual result if the game has ended.
+4. Updates the branch’s values and visit counts.
+
+It ultimately chooses using those visit counts. The checked playing configuration uses **2,000 search simulations per move**. Here, a simulation usually ends at a neural evaluation; it needn’t play a whole random game to completion. [Search implementation](https://github.com/ShivamSarodia/AlphaBlokus/blob/b4470ef9667e7c6f000a0542bb3aaa4d5cce1292/crates/mcts-core/src/search.rs).
+
+**The training labels come from self-play.** The policy learns the search’s visit distribution; the value learns the eventual game outcome. Those updates improve the network used in subsequent games.
+
+Its efficiency choices are particularly relevant to us: the checked configuration runs **1,024 concurrent games**, feeding GPU batches of **128 positions**. It uses cheaper200-simulation searches for80% of moves and1,000-simulation searches for the remainder. Only the full searches are recorded as training examples. [Self-play configuration](https://github.com/ShivamSarodia/AlphaBlokus/blob/b4470ef9667e7c6f000a0542bb3aaa4d5cce1292/configs/self_play/full_mcts_vast.toml).
+
+This strengthens the case for giving a deeper CNN and efficiently batched self-play a serious trial in our project. **Its described training starts without Pentobi demonstrations**; Pentobi supplies a benchmark. I verified the architecture, but haven’t independently reproduced its playing strength or reported training cost.
+
+The fuller explanation and source references are in [our AlphaBlokus study](alphablokus-study.md).

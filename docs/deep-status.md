@@ -4,7 +4,7 @@ User-authorized overnight phase,25 October2026. Methods and budget:
 docs/deep-self-play.md. Chat explanation: docs/alphablokus-explanation.md.
 Original study: docs/alphablokus-study.md. Earlier models remain unchanged.
 
-## Validated and launching
+## Validated and running
 
 - All67 Python tests pass; lint and formatting pass. New tests cover real-process
   shared inference parity, full-game move indices, learning both heads, batched
@@ -39,7 +39,20 @@ same explicitly approved original frontier342 checkpoint leave this Mac. Pentobi
 is fetched from its public v31.0 source, pinned d5374ddc20eced902788e733d67ee16bd1836fd3.
 No AlphaBlokus code/weights are used for initialization or uploaded.
 
-Command being launched after this validated source commit:
+Running app: ap-H3fgjNS4auEbHTqNTsQXon. Source commit6963505b5a96318dcd136368388d7cac1d886e72.
+Started26 October02:04UTC, in detached mode. Linux Pentobi compiled successfully,
+and the independent full-game legality/score cross-check passed before training.
+At the first download check, round7/1,792 games had committed with finite losses.
+Downloaded runs/deep-live-checkpoint-20261026T0209.pt and matching status snapshot;
+the checkpoint loads on this Mac with986,205 parameters and produces a legal move.
+This smoke check is not a strength evaluation or checkpoint selection.
+
+Follow-up automation: finish-overnight-deep-blokus-self-play, every30minutes,
+quiet while healthy. A temporary9hour AC-only system-sleep assertion supports
+local follow-ups; the detached cloud call continues if this client disconnects.
+The display is allowed to sleep. No persistent power settings were changed.
+
+Launched command:
 
 ```sh
 .venv-modal/bin/modal run --detach --profile linuxfan2718 cloud/modal_deep.py --stage study --gpu l40s --run-name duo-deep-study-764 > runs/duo-deep-study-764.log 2>&1
@@ -78,3 +91,19 @@ billing and stopped apps, commit validated code/docs locally, report results her
 and delete the follow-up schedule. No pushing, publishing, outside messages,
 subagents or indefinite larger training series. Further hypotheses need a bounded,
 predeclared design and remaining authorized time/credits; do not tune on these tests.
+
+## Remaining local evidence after cloud completion
+
+Also evaluate each frozen selected policy raw against its own untrained initial
+network and the largest-piece heuristic on the same reserved opening pairs.
+These are additional descriptive learning/baseline checks, not checkpoint selection
+or replacements for the prespecified primary case. Label initial networks as
+untrained networks, not uniform-random opponents. Keep comparison with preserved
+warm round8 raw and searched128 separate; use existing evaluate_many in
+blokus_rl.duo_deep_evaluate, CPU threads chosen by a small timing-only check if useful.
+Do not export the warm checkpoint; do this local comparison after download.
+
+The architecture comparison changes depth, width, normalization and inventory
+conditioning together; it does not isolate residual depth as the cause of a gain.
+This phase uses AlphaZero-style self-generated labels rather than the earlier PPO
+objective. No new results have yet established a stronger agent.
