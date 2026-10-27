@@ -40,6 +40,9 @@ The [frozen-model search sweep](docs/playing-search-sweep.md) then scored
 42.0%, 62.75% and 75.0% against level 2 at 128, 512 and 2,048 simulations,
 respectively, using the same fresh openings across budgets. Extra planning
 improved strength without changing the network weights.
+The subsequent [level 3 test at 2,048 simulations](docs/pentobi-level3.md)
+scored **58.25%** (113 wins, 7 draws, 80 losses; nominal paired 95% interval
+52.25%–64.25%) over 200 fresh games. The model remained frozen.
 See the [protocol](docs/continuation-status.md) for settings, costs and limitations.
 To play the selected agent at the fast 128-simulation budget:
 `.venv/bin/blokus-rl duo-play runs/duo-continuation-final-20261026T2007/duo-continuation-865/frozen-strong1024.pt --simulations 128`.

@@ -1,5 +1,23 @@
 # Frozen strong agent at 2,048 simulations vs Pentobi level 3
 
+The agent scored **58.25%** against Pentobi 31.0 Duo level 3, with a nominal
+95% whole-opening interval of **52.25%–64.25%**. The lower bound exceeds 50%,
+supporting stronger play under this protocol. All 200 games finished and were
+independently replayed. This evaluates one frozen model with additional playing
+search; no learning or checkpoint selection occurred.
+
+| Simulations/move | W/D/L | Win rate | Score (draws half) | Nominal paired 95% interval | Mean margin | Mean game seconds |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| 2,048 | 113/7/80 | 56.50% | 58.25% | 52.25%–64.25% | +0.695 | 9.135 |
+
+This is a fresh book of 100 four-ply openings, with both seats played per
+opening. It differs from the level 2 search sweep, so the change from that
+study's 75% score is not a matched-book estimate of the effect of opponent level.
+The nominal interval concerns this opening distribution, not independent
+training seeds, human Elo or frontier strength. No level 4 test is queued.
+
+## Predeclared design
+
 26 October 2026. Dennis requested the next level after the search sweep.
 Test only level 3; do not increase search further, retrain or advance to level 4.
 
@@ -71,3 +89,57 @@ provider billing must include 27 October UTC for this job, while the study's
 client date remains 26 October EDT. The quiet five-minute follow-up finishes
 only this level 3 test and deletes itself after final reporting or a reported
 blocking failure; it must not begin level 4 or another study.
+
+## Completed execution and local verification
+
+Finished at 20:46 EDT on 26 October; app stopped at 20:46:32 with zero tasks.
+One NVIDIA L40S, two capped CPU cores and 8 GiB RAM; PyTorch 2.14.1+cu130,
+CUDA 13.0, bfloat16 inference. Function runtime was 1,844.26 seconds (30.74
+minutes); arm runtime 1,843.12 seconds; app lifetime 1,905 seconds. Total game
+runtime was 1,827.07 seconds, including both players and protocol overhead.
+The mean game time above is not GPU-only or our-agent-only latency.
+
+There were **3,089 searched decisions**, **6,326,272 actual simulations**,
+4,489,734 neural positions and 615,615 inference batches. Every searched
+decision used exactly 2,048 simulations. Summed policy search time was
+1,817.66 seconds. No preemption, retry, scientific-protocol change, adaptive
+extension or time-limit truncation occurred. The CLI timed out waiting for
+final streamed logs after the result was written; this was a log-stream warning,
+not a failed evaluation. Both completion records exist and the app is stopped.
+
+Provider metering in the saved final snapshot: **$1.09062610**, versus the
+$4.269915 conservative reservation and $5 phase ceiling. Resource metering was
+$1.00858315 L40S, $0.04893907 CPU and $0.03310388 RAM. Billing used 27 October
+UTC, corresponding to the evening of 26 October EDT. Metering may lag; the
+separate account summary reported $31.64137374 metered and $0 billed for the
+month at its snapshot. The $50 reserve remains uncommitted and all compute is
+stopped.
+
+All 100 pair records / 200 action traces were replayed through the Rust engine.
+Legal moves, terminal scores/margins, fresh opening book, seeds, seats, complete
+pair indices and exact simulation counts matched. Every stored summary and
+nominal paired interval was recomputed. Frozen checkpoint, executed runner,
+immutable evaluator and pinned Pentobi binary hashes passed, as did the
+source-commit/configuration checks. The runner checked the private source
+model before and after play. Certified tic-tac-toe and earlier reference
+checkpoints, inherited parent weights/replay checkpoint and both selected
+continuation models remain unchanged.
+
+Complete artifacts: `runs/duo-level3-final-20261027T0049/duo-strong-search2048-level3-2603000`
+(111 files / 434,523 bytes). Derived verification and every downloaded SHA256
+are in that directory's parent. The verifier launches no games:
+
+```sh
+MPLCONFIGDIR=.cache/matplotlib .venv/bin/python runs/duo-strong-search2048-level3-2603000-verify.py runs/duo-level3-final-20261027T0049/duo-strong-search2048-level3-2603000
+```
+
+Provider snapshots: `runs/level3-billing-report-final-20261026.json`,
+`runs/level3-billing-summary-final-20261026.json` and
+`runs/level3-apps-final-20261026.json`. Replay log:
+`runs/level3-final-audit-20261026.log`. Verified second local copy:
+`.backups/pentobi-level3-final-20261026.tar.gz`; its sidecar records the archive
+SHA256 and every archived member hash. The backup includes all new model/game
+artifacts, exact executed source, verifier, provider snapshots and this report.
+Each archived member was read back and checked. Local formatting/lint and diff
+checks passed. The completed study's follow-up is deleted upon final reporting;
+there is no further automatic evaluation or training.
