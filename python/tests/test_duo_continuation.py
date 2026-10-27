@@ -53,3 +53,42 @@ def test_fork_preserves_state_rejects_changed_parent_and_resumes(tmp_path):
     with pytest.raises(ValueError, match="weights do not match"):
         initialize_branch(config, tmp_path / "bad-parent", different, source)
     assert not (tmp_path / "bad-parent").exists()
+
+
+def test_selected_best_resets_optimizer_keeps_replay_and_recovers(tmp_path):
+    configure_torch(91)
+    config = small_config()
+    reference = tmp_path / "reference.pt"
+    save_duo(reference, DuoActorCritic(16), config, 0)
+    parent = tmp_path / "parent"
+    train(config, parent, reference)
+    saved = torch.load(parent / "resume.pt", weights_only=False)
+    selected = parent / "initial.pt"
+    saved["best_checkpoint"] = torch.load(selected, weights_only=True)
+    source = tmp_path / "source.pt"
+    torch.save(saved, source)
+    before = source.read_bytes()
+    child_config = replace(config, seed=1066)
+    with pytest.raises(ValueError, match="weights do not match"):
+        initialize_branch(child_config, tmp_path / "reject", selected, source)
+    left, right = tmp_path / "left", tmp_path / "right"
+    for out in (left, right):
+        initialize_branch(child_config, out, selected, source, selected_best=True)
+        state = torch.load(out / "resume.pt", weights_only=False)
+        assert not state["optimizer"]["state"]
+        assert len(state["replay"]) == len(saved["replay"])
+        assert all(
+            torch.equal(v, state["model_state"][k])
+            for k, v in saved["best_checkpoint"]["model_state"].items()
+        )
+        assert all(
+            np.array_equal(a["visits"], b["visits"])
+            for a, b in zip(state["replay"], saved["replay"], strict=True)
+        )
+    train(child_config, left, selected, resume=True)
+    train(child_config, right, selected, resume=True, stop_after_round=1)
+    train(child_config, right, selected, resume=True)
+    for name in ("final.pt", "best.pt"):
+        a, b = load_duo(left / name).state_dict(), load_duo(right / name).state_dict()
+        assert all(torch.equal(v, b[k]) for k, v in a.items())
+    assert source.read_bytes() == before

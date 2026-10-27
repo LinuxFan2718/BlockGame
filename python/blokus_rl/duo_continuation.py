@@ -21,9 +21,12 @@ def sha256(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
-def initialize_branch(config, out, reference, source_resume):
+def initialize_branch(config, out, reference, source_resume, *, selected_best=False):
     """Create round zero; require the reference to equal the source's latest model.
 
+    With selected_best, require the source's saved best weights instead and reset
+    AdamW: the source optimizer belongs to its latest, possibly different model.
+    Both branches can still inherit exactly the same off-policy replay.
     The unchanged parent is a selection candidate with score 0.5 against itself.
     New checkpoints must improve on it on validation. Counters start at zero for
     additional training; the parent's games/round are recorded separately.
@@ -42,8 +45,9 @@ def initialize_branch(config, out, reference, source_resume):
             if parent_config[key] != getattr(config, key):
                 raise ValueError(f"fork changes unsupported setting: {key}")
     weights = parent.state_dict()
-    if weights.keys() != saved["model_state"].keys() or any(
-        not torch.equal(value, saved["model_state"][key]) for key, value in weights.items()
+    expected = saved["best_checkpoint"]["model_state"] if selected_best else saved["model_state"]
+    if weights.keys() != expected.keys() or any(
+        not torch.equal(value, expected[key]) for key, value in weights.items()
     ):
         raise ValueError("source resume weights do not match the frozen reference")
     if len(saved["replay"]) > config.replay_positions:
@@ -53,6 +57,11 @@ def initialize_branch(config, out, reference, source_resume):
     reference_hash, source_hash = sha256(reference), sha256(source_resume)
     configure_torch(config.seed)
     state = dict(saved)
+    if selected_best:
+        state["model_state"] = weights
+        state["optimizer"] = torch.optim.AdamW(
+            parent.parameters(), lr=config.learning_rate, weight_decay=1e-4
+        ).state_dict()
     state.update(
         config=asdict(config),
         reference_sha256=reference_hash,
@@ -78,7 +87,15 @@ def initialize_branch(config, out, reference, source_resume):
             "parent_round": saved["round"],
             "parent_games": saved["games"],
             "inherited_replay_positions": len(saved["replay"]),
-            "initialization": "parent neural weights, AdamW moments and replay; fresh declared RNG seed",
+            "selected_parent_update": torch.load(reference, map_location="cpu", weights_only=True)[
+                "update"
+            ],
+            "optimizer_reset": selected_best,
+            "initialization": (
+                "saved best neural weights; fresh AdamW; inherited latest replay; fresh declared RNG seed"
+                if selected_best
+                else "parent neural weights, AdamW moments and replay; fresh declared RNG seed"
+            ),
             "training": "additional pure self-play; no expert labels; full-search visit CE + terminal WDL MSE",
             "selection": "parent included at 0.5; searched validation vs frozen parent, equal simulations",
             "parameters": sum(p.numel() for p in parent.parameters()),
