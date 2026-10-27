@@ -90,3 +90,20 @@ changed-config cases. These checks launched no paid jobs. The unchanged
 evaluator's targeted tests include a real Pentobi match and missing-pair/config
 checks. Current apps are stopped and provider metering is about $31.50
 ($0 billed at the snapshot); accounting can lag or fluctuate.
+
+## Level 4 launch audit
+
+Launched once at 21:32 EDT on 26 October (01:32 UTC on 27 October): app
+ap-JR0Ul9EyWFQKBom7k8Pl5D, one active task. Previous apps and local clients
+were stopped before launch. The ledger reserves $4.269915. Source commit
+`464ce06e4d61d1c7d75891e7a5fd0927f0abe865`; exact executed runner SHA256
+`b9700b6d19a0f4660ed13fa2c12ce3dd926b73809dd6d82ba85b9172a5ad3844`.
+The runner/model/evaluator checks passed and the intended 2,048-simulation arm
+started. No model/replay was uploaded. Two targeted evaluator tests passed in
+1.44 seconds; formatting/lint and diff checks passed. The existing level 3
+study and all certified checkpoints remain preserved.
+
+Quiet follow-up: finish-pentobi-levels-4-and-conditional-5. It monitors only this
+level 4 job and the explicitly authorized conditional level 5 test, verifies
+results before advancing, and deletes itself after the stopping result and
+recommendation. Healthy progress and partial scores need no notification.
