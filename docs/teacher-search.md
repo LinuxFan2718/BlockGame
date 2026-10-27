@@ -263,3 +263,23 @@ stays in place. Command, exactly once after validation and commit:
 ```sh
 .venv-modal/bin/modal run --detach --profile linuxfan2718 cloud/modal_teacher_search.py --recover > runs/duo-teacher-search-1066-recovery.log 2>&1
 ```
+
+Recovery launched once at 19:41 EDT on 27 October (23:41 UTC), app
+ap-PxLumtPesHAVP1q9Gz82TA, asynchronous call
+fc-01M5ZVVMEGFF6XHPZNH77XSGHZ. Source commit
+`57ec799575478f6da365419a523373658605d8ea`; exact executed recovery runner
+SHA256 `120489b04cc6b4e0565dbb7214da05d008abde2a33ad4282d7d47388c44caaac`.
+The helper is unchanged. The submission client exited normally; the cloud app
+remains active with one task and printed that it resumed control from round 5.
+The local CLI's “App completed” message describes submission/client completion,
+not completion of the training job. Completion still requires finished.json
+and stopped compute. Original private execution/protocol/failure files remain
+unchanged and recovery-execution.json records this distinct call.
+
+The continuation/recovery tests passed again in 18.93 seconds. Original
+DeepConfig and head-to-head call expressions were compared, both scientific
+branch configurations matched exactly, and the round-5 checksum passed.
+Formatting/lint/compilation and diff checks passed. Quiet follow-up:
+finish-resumed-blokus-training-study, every 15 minutes, through the original
+held-out report only. Final provider billing must include 27 and 28 October UTC
+because this call can cross midnight UTC. No additional paid work is scheduled.
