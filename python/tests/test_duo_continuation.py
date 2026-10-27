@@ -1,4 +1,6 @@
+import importlib.util
 from dataclasses import replace
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -56,6 +58,12 @@ def test_fork_preserves_state_rejects_changed_parent_and_resumes(tmp_path):
 
 
 def test_selected_best_resets_optimizer_keeps_replay_and_recovers(tmp_path):
+    # Match the cloud loader: the copied helper still needs its package context.
+    path = Path(__file__).parents[1] / "blokus_rl/duo_continuation.py"
+    spec = importlib.util.spec_from_file_location("blokus_rl.teacher_continuation", path)
+    helper = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(helper)
+    initialize_selected = helper.initialize_branch
     configure_torch(91)
     config = small_config()
     reference = tmp_path / "reference.pt"
@@ -73,7 +81,7 @@ def test_selected_best_resets_optimizer_keeps_replay_and_recovers(tmp_path):
         initialize_branch(child_config, tmp_path / "reject", selected, source)
     left, right = tmp_path / "left", tmp_path / "right"
     for out in (left, right):
-        initialize_branch(child_config, out, selected, source, selected_best=True)
+        initialize_selected(child_config, out, selected, source, selected_best=True)
         state = torch.load(out / "resume.pt", weights_only=False)
         assert not state["optimizer"]["state"]
         assert len(state["replay"]) == len(saved["replay"])

@@ -122,7 +122,7 @@ def study(execution):
     for name, expected in execution["training_module_sha256"].items():
         if digest(importlib.import_module("blokus_rl." + name).__file__) != expected:
             raise ValueError("immutable installed training module differs: " + name)
-    initialize = load_module("teacher_continuation", helper_path).initialize_branch
+    initialize = load_module("blokus_rl.teacher_continuation", helper_path).initialize_branch
     evaluator = load_module("steps", evaluator_path)
     root.mkdir()
     atomic_json(root / "execution.json", execution)

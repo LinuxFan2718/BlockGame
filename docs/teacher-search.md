@@ -127,3 +127,29 @@ here, back up all new artifacts with every archive member hash verified, confirm
 final metering/stopped apps and commit validated local code/docs. The quiet
 follow-up must notify only meaningful completion/failure, not interim validation
 scores, and delete itself when the bounded study is finished or blocked.
+
+## Preparation and startup audit
+
+Both continuation tests passed in 19.74 seconds, including preservation of the
+original full-state fork and exact interrupted/recovered training from selected
+weights with a fresh optimizer. A real local fork also verified the actual round
+112 CNN, empty AdamW state and all 100,000 inherited replay positions. Existing
+installed training sources match the archived original image payload. Formatting,
+lint and diff checks passed; previous apps were stopped before launch.
+
+The first launch, app ap-HNw7nCM4nv87Q9cqQYx0Hm, stopped after 32 seconds
+(22:39:43–22:40:15 EDT) before creating any study directory or training games.
+The copied helper was loaded without its Python package context, causing an
+ImportError for its relative imports. The loader now names the module
+blokus_rl.teacher_continuation, and the recovery test exercises that exact
+dynamic import path. Scientific settings and source model/replay are unchanged.
+
+The failed app is stopped with zero tasks and the private study directory does
+not exist. Preserve the first executed runner/helper/log/billing snapshot with
+the -startup-failed suffix. The ledger retains the original launch record and
+an explicit settlement of its unused reservation, keeping a conservative $1
+allowance for the stopped startup. One corrected launch reserves $30.30781:
+combined allowance/reservation **$31.30781**, still below the original $32 cap
+and leaving the $50 reserve intact. This is a diagnosed pre-training startup
+correction, not an automatic retry of training or a second experiment. No further
+automatic launch is authorized by this correction.
