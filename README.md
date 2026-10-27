@@ -48,7 +48,8 @@ The [next test stopped at level 4](docs/pentobi-level4-5.md): 33.75% score
 Level 5 was conditional on a win and was not run. The report recommends a
 controlled self-play continuation using stronger training search.
 The [new controlled training study](docs/teacher-search.md) is testing
-1,024 versus 2,048 simulations for self-play targets; results are pending.
+1,024 versus 2,048 simulations for self-play targets. It was cancelled after
+1,280 control games; the checkpoint is preserved, with no held-out result yet.
 See the [protocol](docs/continuation-status.md) for settings, costs and limitations.
 To play the selected agent at the fast 128-simulation budget:
 `.venv/bin/blokus-rl duo-play runs/duo-continuation-final-20261026T2007/duo-continuation-865/frozen-strong1024.pt --simulations 128`.

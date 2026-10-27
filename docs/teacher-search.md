@@ -1,5 +1,14 @@
 # Controlled training with 1,024 versus 2,048 search simulations
 
+**Interrupted; no comparison result is available.** At 22:55 EDT on 26 October,
+Modal delivered `InputCancellation: Input was cancelled by user` while the
+control was collecting its next round. The app stopped at 22:57:09 with zero
+tasks. The logs do not identify who requested cancellation or explain why;
+do not relabel this as preemption, OOM or a learning failure without evidence.
+The control has a consistent atomic checkpoint after five rounds / 1,280 games.
+The teacher branch and held-out tests had not started. No new model was promoted.
+Dennis has been asked whether cancellation was intentional before any resume.
+
 26 October 2026. Dennis approved the proposed controlled self-play experiment
 after our frozen agent lost to Pentobi level 4. This is a new bounded training
 study, not permission for indefinite training or a further ladder benchmark.
@@ -166,3 +175,54 @@ are not used by either main branch. The dynamic-import recovery tests passed
 again in 19.59 seconds. The quiet 15-minute follow-up
 finish-controlled-blokus-training-search-study monitors this app only, prepares
 the final audit/report and deletes itself on completion or a reported blocker.
+
+## Interruption preservation — 26 October, 22:55 EDT
+
+The current app ran 14 minutes 39 seconds from creation to stopped state.
+The failure record covers 777.06 seconds of the function. The saved control
+state covers 597.97 seconds through the last committed round; subsequent
+in-flight work is not counted as retained training. Smoke: 16 discarded games.
+
+| Retained main training | control1024 | teacher2048 |
+| --- | ---: | ---: |
+| Completed rounds | 5 | Not started |
+| Additional games | 1,280 | 0 |
+| Full-search roots | 8,794 | 0 |
+| Gradient updates / examples | 105 / 26,880 | 0 |
+| Simulations in retained rounds | 10,150,752 | 0 |
+| Neural positions in retained rounds | 7,965,254 | 0 |
+| Held-out games | 0 | 0 |
+
+The first scheduled validation was round 16, so the selected checkpoint is
+still the unchanged parent (additional round 0, embedded ancestral update 112).
+No success/failure inference about the 2,048 training hypothesis is possible.
+The training weights in latest.pt match resume.pt exactly; the five progress
+rows, 1,280 games, 100,000 replay entries and all 105 AdamW steps agree. The
+best.pt file was reserialized during resume, so its byte hash differs from the
+parent while all model tensors and embedded update match. This is serialization,
+not evidence of a changed selected model. Source and certified hashes pass.
+
+Downloaded complete stopped state:
+`runs/duo-teacher-interrupted-20261027T0311/duo-teacher-search-1066`
+(24 files / 809,929,770 bytes). The parent directory contains
+interruption-verified.json and download-sha256.json. Atomic control resume SHA256:
+`a3a1875a9379024b9d989e52b0304caa89cefe3cf241d733dbaf7044a9162466`.
+Both original source files and all earlier certified/reference checkpoints
+remain unchanged. The private copy remains available as well.
+
+Provider metering snapshot: failed startup **$0.00561232** plus corrected app
+**$0.55936204**, total **$0.56497436**. This is actual metering, not the net
+$31.30781 reservation. The ledger and both attempts are preserved without
+silently deleting costs. Billing may lag. All paid compute is stopped and the
+$50 credit reserve is intact. No further launch or settlement has occurred.
+
+Verified second local copy: .backups/teacher-search-interrupted-20261026.tar.gz;
+the sidecar contains the archive SHA256 and every member hash. All members were
+read back and matched their source hashes. Provider logs and snapshots are in
+runs/teacher-search-provider-log-20261026.txt,
+runs/teacher-search-apps-stopped-20261026.json and
+runs/teacher-search-interrupted-billing-20261026.json. The monitoring follow-up
+is deleted after reporting this blocker; further progress requires clarification
+of the cancellation. A future explicitly authorized recovery should resume the
+exact round-5 configuration and RNG/optimizer/replay state, preserve the failure
+record, then initialize the teacher only once and complete the reserved tests.
