@@ -46,6 +46,20 @@ STUDIES = {
         "config": CONFIG | {"first_level": 3, "last_level": 3, "seed": 2603000},
         "primary": "absolute score against Pentobi31.0 Duo level3 at2048 simulations",
     },
+    "level4": {
+        "run_name": "duo-strong-search2048-level4-2604000",
+        "ledger": "modal-level4-cost-ledger.jsonl",
+        "budgets": (2048,),
+        "config": CONFIG | {"first_level": 4, "last_level": 4, "seed": 2604000},
+        "primary": "absolute score against Pentobi31.0 Duo level4 at2048 simulations",
+    },
+    "level5": {
+        "run_name": "duo-strong-search2048-level5-2604000",
+        "ledger": "modal-level5-cost-ledger.jsonl",
+        "budgets": (2048,),
+        "config": CONFIG | {"first_level": 5, "last_level": 5, "seed": 2604000},
+        "primary": "absolute score against Pentobi31.0 Duo level5 at2048 simulations",
+    },
 }
 image = (
     modal.Image.from_id(BASE_IMAGE).add_local_file(
@@ -186,16 +200,50 @@ def benchmark(execution):
         raise
 
 
+def require_level4_win(record):
+    """Require a completed local replay audit before the conditional paid level 5 test."""
+    if (
+        record["run_name"] != STUDIES["level4"]["run_name"]
+        or record["level"] != 4
+        or record["checkpoint_sha256"] != MODEL_SHA
+        or record["simulations_per_move"] != 2048
+        or record["games_replayed"] != 200
+        or record["protocol_config"] != STUDIES["level4"]["config"] | {"simulations": 2048}
+        or not record["summary"]["complete"]
+        or record["summary"]["games"] != 200
+        or record["summary"]["opening_pairs"] != 100
+        or record["stopped_app"]["state"] != "stopped"
+        or int(record["stopped_app"]["tasks"]) != 0
+        or not record["certified_checkpoints_unchanged"]
+        or record["summary"]["score_rate"] <= 0.5
+        or record["summary"]["score_rate_95pct_cluster_bootstrap"][0] <= 0.5
+    ):
+        raise ValueError("level 5 requires a verified level 4 score interval above 50%")
+
+
 @app.local_entrypoint()
 def main(study: str = "sweep"):
     if study not in STUDIES:
-        raise ValueError("choose a predeclared study: sweep or level3")
+        raise ValueError("choose a predeclared study: " + ", ".join(STUDIES))
+    if study == "level5":
+        require_level4_win(json.loads((ROOT / "runs/pentobi-level4-verified.json").read_text()))
     selected = STUDIES[study]
     ledger = ROOT / "runs" / selected["ledger"]
     rows = [json.loads(line) for line in ledger.read_text().splitlines()] if ledger.exists() else []
     reservation = HOURLY * (TIMEOUT + 90) / 3600
     if sum(r["reserved_usd"] for r in rows) + reservation > CEILING:
         raise ValueError("phase cap reached; no repeated launches")
+    if study in ("level4", "level5"):
+        phase_reserved = 0.0
+        for name in ("level4", "level5"):
+            phase_ledger = ROOT / "runs" / STUDIES[name]["ledger"]
+            if phase_ledger.exists():
+                phase_reserved += sum(
+                    json.loads(line)["reserved_usd"]
+                    for line in phase_ledger.read_text().splitlines()
+                )
+        if phase_reserved + reservation > 10.0:
+            raise ValueError("combined level 4/5 phase cap reached")
     command = [sys.executable, "-m", "modal"]
     apps = json.loads(
         subprocess.check_output(
