@@ -25,6 +25,8 @@ STATE_SHA = "df74afa8bf699eb63f9dcf4d32cd13530e7b276f66c63ddd28368049edf75911"
 EVALUATOR_SHA = "80727fc7fee1fcdab75eebc989f41f617e6721d4f546e266367ca53f294a0493"
 BINARY_SHA = "ccb2362fc2eb066be9337b76488c527f22aae4ad4b72296ae105e54b2c015882"
 TIMEOUT, CEILING = 43200, 32.0
+RECOVERY_TIMEOUT = 42000
+RECOVERY_SHA = "a3a1875a9379024b9d989e52b0304caa89cefe3cf241d733dbaf7044a9162466"
 HOURLY = 1.95 + 8 * 0.0473 + 24 * 0.008
 HELPER = ROOT / "python/blokus_rl/duo_continuation.py"
 TRAINING_MODULES = ("duo_deep", "duo_shared", "duo_mcts", "duo_deep_evaluate", "duo_conv")
@@ -85,19 +87,7 @@ class Telemetry:
         self.thread.join(timeout=6)
 
 
-@app.function(
-    image=image,
-    gpu="L40S",
-    cpu=(8, 8),
-    memory=(24576, 24576),
-    timeout=TIMEOUT,
-    retries=0,
-    max_containers=1,
-    scaledown_window=2,
-    include_source=False,
-    volumes={"/data": volume},
-)
-def study(execution):
+def run_study(execution):
     import numpy as np
     import torch
     from blokus_rl.duo_crossplay import opening_book, paired_interval
@@ -106,8 +96,23 @@ def study(execution):
     from blokus_rl.duo_learning import load_duo
 
     root = Path("/data") / RUN
-    if root.exists():
+    recovering = execution.get("recovery", False)
+    if root.exists() and not recovering:
         raise ValueError("existing study; no duplicate or automatic retry")
+    if recovering:
+        if (root / "recovery-execution.json").exists():
+            raise ValueError("one recovery already started; no automatic repeats")
+        if (
+            (root / "teacher2048").exists()
+            or (root / "heldout").exists()
+            or (root / "finished.json").exists()
+        ):
+            raise ValueError("recovery expected only the interrupted control")
+        if digest(root / "control1024/resume.pt") != RECOVERY_SHA:
+            raise ValueError("recovery checkpoint differs from verified round5")
+        previous = json.loads((root / "failure.json").read_text())
+        if "InputCancellation" not in previous["traceback"]:
+            raise ValueError("unexpected prior failure")
     if digest(PARENT) != PARENT_SHA or digest(STATE) != STATE_SHA:
         raise ValueError("private parent weights/replay state changed")
     helper_path = Path("/opt/blokus/cloud/teacher_continuation.py")
@@ -124,8 +129,9 @@ def study(execution):
             raise ValueError("immutable installed training module differs: " + name)
     initialize = load_module("blokus_rl.teacher_continuation", helper_path).initialize_branch
     evaluator = load_module("steps", evaluator_path)
-    root.mkdir()
-    atomic_json(root / "execution.json", execution)
+    if not recovering:
+        root.mkdir()
+        atomic_json(root / "execution.json", execution)
     started = time.monotonic()
     torch.set_float32_matmul_precision("high")
     config = DeepConfig(
@@ -144,28 +150,41 @@ def study(execution):
         "control1024": config,
         "teacher2048": replace(config, full_simulations=2048, max_seconds=16200),
     }
-    atomic_json(
-        root / "study-protocol.json",
-        {
-            "parent_sha256": PARENT_SHA,
-            "source_resume_sha256": STATE_SHA,
-            "configs": {k: asdict(v) for k, v in configs.items()},
-            "initialization": "selected best round112 weights; both AdamW optimizers reset; same 100000 latest round128 replay positions",
-            "primary": "paired Pentobi4 score difference teacher2048 minus preserved parent, both playing2048",
-            "secondary": "teacher2048 minus control1024 against Pentobi4; head-to-head; raw policies; Pentobi3",
-            "stretch": "teacher2048 absolute Pentobi4 score interval above0.5",
-            "selection": "every16 rounds against parent512 on32 validation pairs; parent selectable at0.5",
-            "heldout_seed": 2605900,
-            "heldout_pairs": 100,
-            "hardware": {
-                "gpu": torch.cuda.get_device_name(),
-                "cpu_cap": 8,
-                "ram_gib_cap": 24,
-                "torch": str(torch.__version__),
-                "cuda": torch.version.cuda,
-            },
+    protocol = {
+        "parent_sha256": PARENT_SHA,
+        "source_resume_sha256": STATE_SHA,
+        "configs": {k: asdict(v) for k, v in configs.items()},
+        "initialization": "selected best round112 weights; both AdamW optimizers reset; same 100000 latest round128 replay positions",
+        "primary": "paired Pentobi4 score difference teacher2048 minus preserved parent, both playing2048",
+        "secondary": "teacher2048 minus control1024 against Pentobi4; head-to-head; raw policies; Pentobi3",
+        "stretch": "teacher2048 absolute Pentobi4 score interval above0.5",
+        "selection": "every16 rounds against parent512 on32 validation pairs; parent selectable at0.5",
+        "heldout_seed": 2605900,
+        "heldout_pairs": 100,
+        "hardware": {
+            "gpu": torch.cuda.get_device_name(),
+            "cpu_cap": 8,
+            "ram_gib_cap": 24,
+            "torch": str(torch.__version__),
+            "cuda": torch.version.cuda,
         },
-    )
+    }
+    if recovering:
+        if json.loads((root / "study-protocol.json").read_text()) != protocol:
+            raise ValueError("recovery would change the original scientific protocol")
+        saved = torch.load(root / "control1024/resume.pt", map_location="cpu", weights_only=False)
+        if saved["round"] != 5 or saved["games"] != 1280 or saved["config"] != asdict(config):
+            raise ValueError("recovery configuration or progress changed")
+        del saved
+        original = json.loads((root / "execution.json").read_text())
+        if (
+            original["runner_sha256"]
+            != "90e2982ec88de7d771b2560dcdff95712ca8e5fe542787d2e1cb8b917ce5f550"
+        ):
+            raise ValueError("unexpected original execution")
+        atomic_json(root / "recovery-execution.json", execution)
+    else:
+        atomic_json(root / "study-protocol.json", protocol)
     volume.commit()
     try:
         with Telemetry(root / "telemetry.jsonl"):
@@ -182,14 +201,23 @@ def study(execution):
                 validation_simulations=8,
                 max_seconds=300,
             )
-            initialize(smoke, root / "smoke", PARENT, STATE, selected_best=True)
-            train(smoke, root / "smoke", PARENT, resume=True, stop_after_round=1)
-            train(smoke, root / "smoke", PARENT, resume=True, commit=volume.commit)
-            atomic_json(root / "cuda-smoke-passed.json", {"rounds": 2, "unpromoted": True})
+            if not recovering:
+                initialize(smoke, root / "smoke", PARENT, STATE, selected_best=True)
+                train(smoke, root / "smoke", PARENT, resume=True, stop_after_round=1)
+                train(smoke, root / "smoke", PARENT, resume=True, commit=volume.commit)
+                atomic_json(root / "cuda-smoke-passed.json", {"rounds": 2, "unpromoted": True})
+            elif json.loads((root / "cuda-smoke-passed.json").read_text()) != {
+                "rounds": 2,
+                "unpromoted": True,
+            }:
+                raise ValueError("original CUDA smoke did not pass")
             for name, cfg in configs.items():
-                initialize(cfg, root / name, PARENT, STATE, selected_best=True)
-                volume.commit()
-                print("Starting training " + name, flush=True)
+                if recovering and name == "control1024":
+                    print("Resuming control1024 from verified round5 /1280 games", flush=True)
+                else:
+                    initialize(cfg, root / name, PARENT, STATE, selected_best=True)
+                    volume.commit()
+                    print("Starting training " + name, flush=True)
                 train(cfg, root / name, PARENT, resume=True, commit=volume.commit)
             frozen = {}
             for name in configs:
@@ -287,7 +315,10 @@ def study(execution):
             atomic_json(
                 root / "finished.json",
                 {
-                    "seconds": time.monotonic() - started,
+                    "seconds": time.monotonic()
+                    - started
+                    + (previous["seconds"] if recovering else 0),
+                    "recovery_seconds": time.monotonic() - started if recovering else None,
                     "finish_utc": datetime.now(timezone.utc).isoformat(),
                     "checkpoint_sha256": frozen,
                     "parent_sha256": PARENT_SHA,
@@ -304,18 +335,51 @@ def study(execution):
         return {"run_name": RUN, "checkpoint_sha256": frozen, "seconds": time.monotonic() - started}
     except BaseException:
         atomic_json(
-            root / "failure.json",
+            root / ("recovery-failure.json" if recovering else "failure.json"),
             {"traceback": traceback.format_exc(), "seconds": time.monotonic() - started},
         )
         volume.commit()
         raise
 
 
+@app.function(
+    image=image,
+    gpu="L40S",
+    cpu=(8, 8),
+    memory=(24576, 24576),
+    timeout=TIMEOUT,
+    retries=0,
+    max_containers=1,
+    scaledown_window=2,
+    include_source=False,
+    volumes={"/data": volume},
+)
+def study(execution):
+    return run_study(execution)
+
+
+@app.function(
+    image=image,
+    gpu="L40S",
+    cpu=(8, 8),
+    memory=(24576, 24576),
+    timeout=RECOVERY_TIMEOUT,
+    retries=0,
+    max_containers=1,
+    scaledown_window=2,
+    include_source=False,
+    volumes={"/data": volume},
+)
+def recover_study(execution):
+    return run_study(execution)
+
+
 @app.local_entrypoint()
-def main():
+def main(recover: bool = False):
     ledger = ROOT / "runs/modal-teacher-search-cost-ledger.jsonl"
     rows = [json.loads(line) for line in ledger.read_text().splitlines()] if ledger.exists() else []
-    reservation = HOURLY * (TIMEOUT + 90) / 3600
+    timeout = RECOVERY_TIMEOUT if recover else TIMEOUT
+    reservation = HOURLY * (timeout + 90) / 3600
     if sum(r["reserved_usd"] for r in rows) + reservation > CEILING:
         raise ValueError("study reservation ceiling reached; no duplicate launch")
     command = [sys.executable, "-m", "modal"]
@@ -336,10 +400,11 @@ def main():
     execution = {
         "utc": datetime.now(timezone.utc).isoformat(),
         "run_name": RUN,
+        "recovery": recover,
         "profile": "linuxfan2718",
         "reserved_usd": reservation,
         "phase_ceiling_usd": CEILING,
-        "timeout_seconds": TIMEOUT,
+        "timeout_seconds": timeout,
         "hourly_usd": HOURLY,
         "base_image": BASE_IMAGE,
         "parent_sha256": PARENT_SHA,
@@ -355,13 +420,25 @@ def main():
             ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True
         ).strip(),
         "uploads": "runner and continuation helper only; no model/replay",
+        "submission": "one asynchronous Function.spawn call; detached app; no local wait",
     }
-    prefix = ROOT / "runs" / RUN
+    if recover:
+        execution["expected_resume_sha256"] = RECOVERY_SHA
+        execution["authorization"] = (
+            "Dennis: No—resume from the saved checkpoint within the original $32 cap"
+        )
+    prefix = ROOT / "runs" / (RUN + "-recovery" if recover else RUN)
     Path(str(prefix) + "-runner.py").write_bytes(Path(__file__).read_bytes())
     Path(str(prefix) + "-helper.py").write_bytes(HELPER.read_bytes())
     Path(str(prefix) + "-billing-before.json").write_text(json.dumps(billing, indent=2) + "\n")
     with ledger.open("a") as f:
         f.write(json.dumps(execution) + "\n")
-    result = study.remote(execution)
-    Path(str(prefix) + "-modal-result.json").write_text(json.dumps(result, indent=2) + "\n")
-    print(json.dumps(result), flush=True)
+    call = (recover_study if recover else study).spawn(execution)
+    receipt = {
+        "run_name": RUN,
+        "function_call_id": call.object_id,
+        "submitted": True,
+        "recovery": recover,
+    }
+    Path(str(prefix) + "-modal-submission.json").write_text(json.dumps(receipt, indent=2) + "\n")
+    print(json.dumps(receipt), flush=True)

@@ -1,13 +1,19 @@
 # Controlled training with 1,024 versus 2,048 search simulations
 
-**Interrupted; no comparison result is available.** At 22:55 EDT on 26 October,
+**Checkpoint recovery authorized; results pending.** Dennis confirmed the
+cancellation was unintentional and explicitly requested resuming the saved
+checkpoint within the original $32 cap. The recovery continues control round 6
+without resetting its optimizer, RNG or replay, then runs the original teacher
+branch and tests. No training settings or test/selection books are changed.
+
+At 22:55 EDT on 26 October,
 Modal delivered `InputCancellation: Input was cancelled by user` while the
 control was collecting its next round. The app stopped at 22:57:09 with zero
 tasks. The logs do not identify who requested cancellation or explain why;
 do not relabel this as preemption, OOM or a learning failure without evidence.
 The control has a consistent atomic checkpoint after five rounds / 1,280 games.
 The teacher branch and held-out tests had not started. No new model was promoted.
-Dennis has been asked whether cancellation was intentional before any resume.
+Dennis subsequently confirmed this cancellation was not intentional.
 
 26 October 2026. Dennis approved the proposed controlled self-play experiment
 after our frozen agent lost to Pentobi level 4. This is a new bounded training
@@ -226,3 +232,34 @@ is deleted after reporting this blocker; further progress requires clarification
 of the cancellation. A future explicitly authorized recovery should resume the
 exact round-5 configuration and RNG/optimizer/replay state, preserve the failure
 record, then initialize the teacher only once and complete the reserved tests.
+
+## Explicitly authorized checkpoint recovery — 27 October
+
+Human answer: “No—resume from the saved checkpoint within the original $32 cap.”
+The recovery refuses any state other than the verified round-5 SHA256 above,
+checks the saved configuration and original protocol exactly, and records an
+exclusive recovery-execution.json marker before doing work. It preserves the
+original execution/failure files and five progress rows, skips the discarded
+smoke, resumes control at round 6 and initializes teacher2048 only once. A new
+failure is written to recovery-failure.json. No further automatic attempt.
+
+Hard recovery timeout 42,000 seconds (11 hours 40 minutes), shorter than the
+original 12-hour call. Same L40S/8 capped cores/24 GiB, rate $2.5204/hour,
+retries0/max1container. Reservation including 90 seconds startup **$29.46767667**.
+The original failed/cancelled apps are stopped; their final snapshot total
+$0.56497436 fits the existing conservative $1 allowance. An explicit journal
+entry releases only the cancelled call's unused reservation; no old entry or
+actual cost is removed. Net allowance plus new reservation **$30.46767667** is
+below the original $32 ceiling. The $50 reserve is unchanged.
+
+Submission now uses one asynchronous Function.spawn call with a saved call ID
+and --detach, so the local client can exit normally without waiting for training.
+This reduces dependence on the terminal/session lifecycle; it is not proof of
+the cancellation's cause. See [Modal's detached-app documentation](https://modal.com/docs/guide/apps)
+and [asynchronous job submission](https://modal.com/docs/guide/job-queue).
+Only the updated runner and identical helper are uploaded; private model/replay
+stays in place. Command, exactly once after validation and commit:
+
+```sh
+.venv-modal/bin/modal run --detach --profile linuxfan2718 cloud/modal_teacher_search.py --recover > runs/duo-teacher-search-1066-recovery.log 2>&1
+```
