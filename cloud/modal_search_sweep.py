@@ -1,4 +1,4 @@
-"""One bounded, fixed-model playing-search sweep against Pentobi level2."""
+"""Bounded, predeclared fixed-model Pentobi evaluations using one private image."""
 
 import hashlib
 import importlib.util
@@ -31,6 +31,22 @@ CONFIG = {
     "device": "cuda",
     "precision": "bfloat16",
 }
+STUDIES = {
+    "sweep": {
+        "run_name": RUN_NAME,
+        "ledger": "modal-search-sweep-cost-ledger.jsonl",
+        "budgets": BUDGETS,
+        "config": CONFIG,
+        "primary": "paired score difference: search2048 minus search128",
+    },
+    "level3": {
+        "run_name": "duo-strong-search2048-level3-2603000",
+        "ledger": "modal-level3-cost-ledger.jsonl",
+        "budgets": (2048,),
+        "config": CONFIG | {"first_level": 3, "last_level": 3, "seed": 2603000},
+        "primary": "absolute score against Pentobi31.0 Duo level3 at2048 simulations",
+    },
+}
 image = (
     modal.Image.from_id(BASE_IMAGE).add_local_file(
         __file__, "/opt/blokus/cloud/modal_search_sweep.py", copy=True
@@ -58,7 +74,15 @@ def benchmark(execution):
     import torch
     from blokus_rl.duo_deep import atomic_json
 
-    root = Path("/data") / RUN_NAME
+    selected = STUDIES[execution["study"]]
+    budgets, config = selected["budgets"], selected["config"]
+    if (
+        execution["run_name"] != selected["run_name"]
+        or execution["budgets"] != list(budgets)
+        or execution["shared_config"] != config
+    ):
+        raise ValueError("execution differs from the predeclared study")
+    root = Path("/data") / selected["run_name"]
     if root.exists():
         raise ValueError("existing sweep; no duplicate or automatic recovery")
     if hashlib.sha256(Path(MODEL).read_bytes()).hexdigest() != MODEL_SHA:
@@ -74,13 +98,13 @@ def benchmark(execution):
         root / "protocol.json",
         {
             "execution": execution,
-            "budgets": list(BUDGETS),
-            "shared_config": CONFIG,
+            "budgets": list(budgets),
+            "shared_config": config,
             "model_sha256": MODEL_SHA,
             "evaluator_sha256": EVALUATOR_SHA,
-            "primary": "paired score difference: search2048 minus search128",
-            "secondary": "512 minus128; 2048 minus512; absolute Pentobi scores and runtime",
-            "stopping": "complete all3 fixed budgets, regardless of intermediate scores",
+            "primary": selected["primary"],
+            "secondary": "WDL, win rate, absolute scores, margins, actual budgets and runtime",
+            "stopping": "complete every prespecified game; no stopping on intermediate scores",
             "inference": "whole-opening paired bootstrap, nominal95%; one frozen lineage",
         },
     )
@@ -89,16 +113,16 @@ def benchmark(execution):
     started = time.monotonic()
     results = {}
     try:
-        for budget in BUDGETS:
+        for budget in budgets:
             print(f"Starting frozen model at {budget} simulations", flush=True)
             arm_started = time.monotonic()
             result = module.run(
-                CONFIG | {"simulations": budget},
+                config | {"simulations": budget},
                 MODEL,
                 "/opt/pentobi-build/pentobi_gtp/pentobi-gtp",
                 root / f"search-{budget}",
                 commit=volume.commit,
-            )["2"]
+            )[str(config["first_level"])]
             results[str(budget)] = result
             atomic_json(
                 root / f"search-{budget}/timing.json",
@@ -138,14 +162,17 @@ def benchmark(execution):
         atomic_json(
             root / "finished.json",
             {
-                "budgets": list(BUDGETS),
+                "budgets": list(budgets),
                 "games": sum(r["games"] for r in results.values()),
                 "model_sha256": MODEL_SHA,
                 "seconds": time.monotonic() - started,
             },
         )
         volume.commit()
-        return {"run_name": RUN_NAME, "scores": {k: r["score_rate"] for k, r in results.items()}}
+        return {
+            "run_name": selected["run_name"],
+            "scores": {k: r["score_rate"] for k, r in results.items()},
+        }
     except BaseException:
         atomic_json(
             root / "failure.json",
@@ -160,8 +187,11 @@ def benchmark(execution):
 
 
 @app.local_entrypoint()
-def main():
-    ledger = ROOT / "runs/modal-search-sweep-cost-ledger.jsonl"
+def main(study: str = "sweep"):
+    if study not in STUDIES:
+        raise ValueError("choose a predeclared study: sweep or level3")
+    selected = STUDIES[study]
+    ledger = ROOT / "runs" / selected["ledger"]
     rows = [json.loads(line) for line in ledger.read_text().splitlines()] if ledger.exists() else []
     reservation = HOURLY * (TIMEOUT + 90) / 3600
     if sum(r["reserved_usd"] for r in rows) + reservation > CEILING:
@@ -184,7 +214,8 @@ def main():
     data = Path(__file__).read_bytes()
     execution = {
         "utc": datetime.now(timezone.utc).isoformat(),
-        "run_name": RUN_NAME,
+        "run_name": selected["run_name"],
+        "study": study,
         "profile": "linuxfan2718",
         "reserved_usd": reservation,
         "phase_ceiling_usd": CEILING,
@@ -195,13 +226,13 @@ def main():
         "model_source": "existing private Volume; no model upload",
         "runner_sha256": hashlib.sha256(data).hexdigest(),
         "evaluator_sha256": EVALUATOR_SHA,
-        "budgets": list(BUDGETS),
-        "shared_config": CONFIG,
+        "budgets": list(selected["budgets"]),
+        "shared_config": selected["config"],
         "source_commit": subprocess.check_output(
             ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True
         ).strip(),
     }
-    prefix = ROOT / f"runs/{RUN_NAME}"
+    prefix = ROOT / "runs" / selected["run_name"]
     Path(str(prefix) + "-runner.py").write_bytes(data)
     Path(str(prefix) + "-billing-before.json").write_text(json.dumps(billing, indent=2) + "\n")
     with ledger.open("a") as handle:
