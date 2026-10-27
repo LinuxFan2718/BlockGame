@@ -153,3 +153,16 @@ combined allowance/reservation **$31.30781**, still below the original $32 cap
 and leaving the $50 reserve intact. This is a diagnosed pre-training startup
 correction, not an automatic retry of training or a second experiment. No further
 automatic launch is authorized by this correction.
+
+Corrected app ap-jflsIhwP1giVlNWVH3ArFn launched at 22:42 EDT on 26 October
+(02:42 UTC on 27 October). Source commit
+`7021e444faae89a30ba9b17546ae04f8d55cdfc8`; executed runner SHA256
+`90e2982ec88de7d771b2560dcdff95712ca8e5fe542787d2e1cb8b917ce5f550`;
+helper SHA256 `fa56da7f6668bf2e1e5f3e540a96c424aff0b62a473091b4f4462ad472a26465`.
+All private source, installed training-module, evaluator and binary hash checks
+passed. The discarded CUDA smoke completed two rounds / 16 games with an
+interrupted/recovered training boundary, then control1024 started. Its weights
+are not used by either main branch. The dynamic-import recovery tests passed
+again in 19.59 seconds. The quiet 15-minute follow-up
+finish-controlled-blokus-training-search-study monitors this app only, prepares
+the final audit/report and deletes itself on completion or a reported blocker.
