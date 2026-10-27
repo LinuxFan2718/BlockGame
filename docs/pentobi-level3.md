@@ -27,8 +27,8 @@ New mode: cloud/modal_search_sweep.py --study level3. Only this updated runner
 is uploaded; the model/replay stays in its private Volume. Its source model
 hash is checked before and after evaluation.
 
-Run: duo-strong-search2048-level 3-2603000, Volume blokus-deep-selfplay-20261026,
-profile linuxfan2718. Ledger: runs/modal-level 3-cost-ledger.jsonl.
+Run: duo-strong-search2048-level3-2603000, Volume blokus-deep-selfplay-20261026,
+profile linuxfan2718. Ledger: runs/modal-level3-cost-ledger.jsonl.
 One L40S, 2 capped cores, 8 GiB RAM, 2-hour hard timeout, retries 0, max 1 container.
 Provider rates checked before launch: GPU $1.95/hour, CPU $0.0473/core-hour,
 RAM $0.008/GiB-hour. Reserve $4.269915 under a $5 phase ceiling; retain $50 of the
@@ -43,7 +43,7 @@ configuration changes. Re-run them and lint/compile/diff checks before launch.
 Launch once:
 
 ```sh
-.venv-modal/bin/modal run --detach --profile linuxfan2718 cloud/modal_search_sweep.py --study level3 > runs/duo-strong-search2048-level 3-2603000.log 2>&1
+.venv-modal/bin/modal run --detach --profile linuxfan2718 cloud/modal_search_sweep.py --study level3 > runs/duo-strong-search2048-level3-2603000.log 2>&1
 ```
 
 After finished.json/hardware.json and a stopped app with zero tasks, download
