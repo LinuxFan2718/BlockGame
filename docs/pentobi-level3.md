@@ -53,3 +53,21 @@ recompute summaries and intervals, append results here, save final provider
 costs, back up new artifacts with verified member hashes and commit validated
 code/docs locally. Preserve all prior certified checkpoints. Remove any quiet
 follow-up when complete. No further paid study is queued by this test.
+
+## Launch audit
+
+Launched once at 20:14 EDT on 26 October (00:14 UTC on 27 October): app
+ap-7FACuY7ou2YoW5eIBuZTSO. Source commit
+`1ef7bc6832224b769de0535e2ce4b427c02289d0`; exact executed runner SHA256
+`032f5fca06f0e67f66e1dd2e402b3bff1a3bdcedbc116c11a419edd9b2b1be6a`.
+The single ledger entry reserves $4.269915. Hash and study-configuration checks
+passed and the intended search 2048 arm started. No model was uploaded. All
+prior apps were stopped before this launch. The two targeted tests passed in
+2.10 seconds; lint/format/compile and diff checks passed.
+
+Prepared local audit: runs/duo-strong-search2048-level3-2603000-verify.py; pass
+the downloaded run directory as its argument. It launches no games. Final
+provider billing must include 27 October UTC for this job, while the study's
+client date remains 26 October EDT. The quiet five-minute follow-up finishes
+only this level 3 test and deletes itself after final reporting or a reported
+blocking failure; it must not begin level 4 or another study.
