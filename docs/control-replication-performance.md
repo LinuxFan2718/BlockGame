@@ -97,3 +97,53 @@ figures were visually inspected. At 12:26 EDT the app still had one task; the
 previous integrated app was stopped. Account metering was **$54.44137374** across
 all work, not a per-study charge. Profiling did not add a separate paid app or
 increase the existing $11 ceiling. Final billing will be refreshed at closeout.
+
+## Final phase profile and stop confirmation
+
+The helper completed at **12:56:24 EDT**, the wrapper at **12:56:26**, and the app
+stopped with zero tasks at **12:56:42**. All 64 training rounds and 1,200 held-out
+games completed. Whole-function telemetry has **738 samples**: GPU busy mean
+**18.23%**, p95 **38%**; CPU mean **2.24 of 8 cores**; peak host RAM **12.29/24 GiB**;
+peak VRAM **2,699/49,140 MiB**. These mixed phases include the short profiling
+probes and cannot be read as peak-FLOP utilization or a pure collection profile.
+
+| Provider-log phase | Wall seconds | GPU busy mean | CPU cores mean | Peak host RAM GiB |
+|---|---:|---:|---:|---:|
+| Training and setup | 1800.00 | 17.2% | 3.61 | 12.29 |
+| Parent vs Pentobi 3 | 341.00 | 25.9% | 0.96 | 6.63 |
+| Parent vs Pentobi 4 | 404.00 | 19.5% | 0.92 | 6.63 |
+| Control vs Pentobi 3 | 346.00 | 24.2% | 0.94 | 6.62 |
+| Control vs Pentobi 4 | 350.00 | 27.6% | 0.96 | 6.62 |
+| Searched control–parent | 457.00 | 4.5% | 1.00 | 7.35 |
+| Raw control–parent | 4.32 | One sample only | — | 7.13 |
+
+Phase boundaries come from one-second-resolution provider log timestamps and
+include commits/setup. The raw phase has only one five-second telemetry sample,
+so its resource averages are not interpretable. The separately bounded training
+window above starts at the initialization-audit marker, explaining the small
+sampling difference from the training/setup log phase.
+
+The searched head-to-head path averaged about one CPU core and 4.5% GPU busy;
+its implementation differs from the six-worker self-play collector. Increasing
+GPU capacity alone would not address its serial host path. Additional evaluation
+parallelism and separately timed persistence are useful future measurements,
+subject to preserving seeds, search accounting and recovery guarantees. No new
+benchmark is launched here.
+
+`runs/control-replication-final-20261028T171624Z/analyze-phases.py` recomputes
+`phase-performance.json` from timestamped logs and raw telemetry. The final
+strength comparison is inconclusive against Pentobi 4; the full result and
+interpretation are in [the replication report](control-replication.md). The
+$2.62553148 provider app cost includes profiling in this allocation; no separate
+profiling app or extra games/gradients were launched. The original frozen runtime
+was preserved throughout. The copy patch remains locally staged and requires a
+whole-collection comparison before future cloud selection.
+
+All raw evidence, reports, figures, source and final artifacts are covered by
+the member-hash-verified final backup. Compute is stopped, protected models are
+unchanged, and the shared completion/performance follow-up is removed at closeout.
+
+Final refreshed CLI snapshots confirm all returned apps stopped with zero tasks,
+provider app cost **$2.62553148**, and account meter **$55.51137374** below the
+$80 allowance. All 35 protected checkpoint hashes and all 454 downloaded run-member
+hashes were rechecked before archival. No additional paid work is scheduled.

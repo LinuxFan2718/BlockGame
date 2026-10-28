@@ -28,6 +28,7 @@ def main():
         ROOT / "docs/control-replication-performance.md",
         ROOT / "python/blokus_rl/duo_cuda_graphs.py",
         ROOT / "python/tests/test_duo_graph_outputs.py",
+        ROOT / "python/tests/test_control_replication_launcher.py",
         ROOT / "cloud/profile_result_copies.py",
         ROOT / "cloud/report_live_performance.py",
     }
@@ -37,6 +38,7 @@ def main():
         ROOT / "runs/integrated-payload-1070",
         *[p for p in (ROOT / "runs").glob("control-replication-profile-*") if p.is_dir()],
         *[p for p in (ROOT / "runs").glob("control-replication-monitor-*") if p.is_dir()],
+        *[p for p in (ROOT / "runs").glob("control-replication-startup-snapshot-*") if p.is_dir()],
         *args.run,
     ):
         if prefix.exists():

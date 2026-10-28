@@ -75,12 +75,17 @@ level 4. All 1,200 external traces were replayed; the 800 head-to-head outcomes
 and counters were audited without saved traces. All app attempts metered $6.83;
 compute is stopped. Replication is recommended before scaling. The report records
 the actual 08:47–11:18 EDT morning run, which did not start overnight.
-The authorized [fresh-seed control replication](docs/control-replication.md)
-was submitted at 11:53 EDT, using the original parent, the cheaper 1,024-search
-training recipe and a fresh held-out book. Its result is pending; the $11 phase
-ceiling preserves the existing $50 credit reserve.
-The [live profile and copy optimization](docs/control-replication-performance.md)
-show remaining host/inference overhead; the active replication keeps its pinned runtime.
+The completed [fresh-seed control replication](docs/control-replication.md)
+finished 16,384 training games and 1,200 held-out games. Its Pentobi-4 score was
+37.75% versus the retested parent’s 39.0%; paired difference −1.25 points
+(nominal 95% interval −8.25 to +5.75), inconclusive. The earlier external gain
+was not reproduced. It scored 58% head-to-head with search against the parent,
+showing opponent-specific results. All 800 external traces and 400 head-to-head
+outcomes/counters were verified. Cost was $2.63 under the $11 ceiling; compute
+is stopped and the $50 reserve retained. Diagnose selection/generalization before
+more training. The [performance profile and local copy optimization](docs/control-replication-performance.md)
+record spare hardware capacity and 5–32% lower copy-component time; the frozen
+study runtime was unchanged and no whole-workload speedup is claimed.
 See the [protocol](docs/continuation-status.md) for settings, costs and limitations.
 To play the earlier preserved parent at the fast 128-simulation budget:
 `.venv/bin/blokus-rl duo-play runs/duo-continuation-final-20261026T2007/duo-continuation-865/frozen-strong1024.pt --simulations 128`.
