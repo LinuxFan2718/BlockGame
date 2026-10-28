@@ -105,3 +105,11 @@ without claiming head-to-head action replay. Download only after finished marker
 and stopped app0tasks into an unused pre-created local parent. Verify every backup
 archive member by readback, inspect billing/stopped apps, commit validated local
 code/docs without pushing, report results here and delete the follow-up.
+
+First submission `ap-KwsyrmMhvZpLz8Xy9P9LSy` built the Linux extension but the
+prelaunch app guard then counted its own zero-task submission app and refused to
+spawn a GPU call. No validation/training directory or GPU function was created.
+The guard now excludes its own app; the other-active-app check remains. Original
+log is retained with `-prelaunch-guard` suffix and any image-build metering remains
+part of this phase's costs. The source-only payload and scientific protocol did
+not change.

@@ -241,7 +241,11 @@ def main(stage: str = "validate"):
         )
 
     apps, billing, rates = cli("app", "list"), cli("billing", "summary"), cli("billing", "rates")
-    if any(int(row["tasks"]) or row["state"].lower() not in ("stopped",) for row in apps):
+    if any(
+        int(row["tasks"]) or row["state"].lower() not in ("stopped",)
+        for row in apps
+        if row["app_id"] != app.app_id
+    ):
         raise ValueError("active apps; inspect before launch")
     actual_rate = (
         float(rates["gpu_hour_cost_l40s"])
