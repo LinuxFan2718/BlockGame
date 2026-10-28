@@ -26,9 +26,10 @@ HOURLY = 2.5204
 NAMES = {
     "validate": "duo-integrated-validation-1070",
     "validate-import": "duo-integrated-validation-1070",
+    "validate-sdk": "duo-integrated-validation-1070-sdk",
     "study": "duo-integrated-teacher-1070",
 }
-TIMEOUTS = {"validate": 1200, "validate-import": 1200, "study": 28800}
+TIMEOUTS = {"validate": 1200, "validate-import": 1200, "validate-sdk": 1200, "study": 28800}
 image = (
     modal.Image.from_id(BASE_IMAGE)
     .add_local_file(__file__, "/opt/blokus/cloud/modal_integrated.py", copy=True)
@@ -139,9 +140,25 @@ def run(execution):
             + "\n"
         )
         volume.commit()
-        env = dict(os.environ, PYTHONPATH="/opt/integrated/payload/python")
+        env = dict(
+            os.environ,
+            PYTHONPATH=os.pathsep.join(
+                ["/opt/integrated/payload/python", *[p for p in sys.path if p]]
+            ),
+        )
         env.pop("BLOKUS_NATIVE_PATH", None)
         env.pop("BLOKUS_BASELINE_EXTENSION", None)
+        # Exercise the exact child SDK path and mounted-volume commit before science.
+        subprocess.run(
+            [
+                sys.executable,
+                "-c",
+                "import modal; v = modal.Volume.from_name('blokus-deep-selfplay-20261026', create_if_missing=False); v.commit(); print('Child SDK and Volume commit verified', flush=True)",
+            ],
+            env=env,
+            check=True,
+            timeout=30,
+        )
         if stage != "study":
             subprocess.run(
                 [

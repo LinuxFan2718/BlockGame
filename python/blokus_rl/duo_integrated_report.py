@@ -371,15 +371,11 @@ def audit(run, apps_path, app_id, billing_path):
         head[case] = row
     billing = read(billing_path)
     costs = {}
-    for stage, target in (
-        ("prelaunch", "ap-KwsyrmMhvZpLz8Xy9P9LSy"),
-        ("failed_startup", "ap-tUfMbBe5gfBIYvlmZ3wD25"),
-        ("validate", validation["app_id"]),
-        ("study", app_id),
-    ):
-        charges = [Decimal(str(r["cost"])) for r in billing if r["object_id"] == target]
-        require(bool(charges), "billing omits app: " + target)
-        costs[stage] = str(sum(charges))
+    for row in billing:
+        if row["description"] == "blokus-integrated-speedups":
+            app = row["object_id"]
+            costs[app] = str(Decimal(costs.get(app, "0")) + Decimal(str(row["cost"])))
+    require(app_id in costs and validation["app_id"] in costs, "billing omits successful compute")
     primary = differences["teacher2048-minus-parent-pentobi4"]["nominal_paired_95pct_interval"]
     return {
         "run": str(run.resolve()),

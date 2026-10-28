@@ -130,3 +130,16 @@ injected into function containers and is absent in the base image builder. This
 was caught before GPU allocation/submission; the check now verifies Python module
 discovery and compilation without depending on the injected SDK. Its build log is
 retained with `-build-check` suffix. All build costs remain included.
+
+App`ap-CioAB9zwQl4m3qfaDzvsrf` passed the complete native comparison, then its
+subprocess lacked `/pkg`, the runtime-injected SDK path, because the wrapper
+replaced PYTHONPATH. It failed before numerical checks, smoke games or training.
+The wrapper now preserves its runtime Python paths behind the explicit overlay
+and verifies child SDK import **and mounted Volume commit** before scientific
+work. Failed artifacts remain under the original validation directory; the
+single corrected `validate-sdk` stage uses unused directory
+`duo-integrated-validation-1070-sdk`. The payload remains unchanged. A ledger
+settlement keeps$1 reserved for all stopped startup attempts and releases only
+their unused reservation. With the corrected validation and full8h run, net
+reservations will be$22.27935 under the original$23 cap. Actual charges for every
+attempt are reported separately and are never erased by settlement.
