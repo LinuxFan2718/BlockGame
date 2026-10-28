@@ -322,3 +322,10 @@ MPLCONFIGDIR=.cache/matplotlib .venv/bin/python -m blokus_rl.duo_teacher_report 
 The tool writes verification.json and a complete downloaded-file hash manifest
 only after the checks pass. A final report, plot, verified backup, final costs
 and stopping the follow-up remain required after the reserved tests finish.
+
+Dennis separately requested a live performance profile on 27 October evening.
+The measurements and optimization recommendations are saved in
+[teacher-performance-profile.md](teacher-performance-profile.md), including a
+separate local geometry-cache component benchmark. The running scientific
+study, resource limits, model and search settings were not changed. This
+performance investigation supplies no new evidence of playing strength.
