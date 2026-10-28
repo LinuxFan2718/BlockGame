@@ -104,7 +104,7 @@ class DuoConvActorCritic(nn.Module):
 
     def distribution(self, observation, candidates, mask=None):
         if mask is None:
-            mask = torch.ones(candidates.shape[:-1], dtype=torch.bool)
+            mask = torch.ones(candidates.shape[:-1], dtype=torch.bool, device=candidates.device)
         if not mask.any(-1).all():
             raise ValueError("empty candidate set")
         scores, value = self(observation)

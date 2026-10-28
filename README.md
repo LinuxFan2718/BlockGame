@@ -334,6 +334,11 @@ in how often a bot loses.
 
 ## Blokus Duo
 
+**Play visually on this Mac:** double-click [Play Blokus.command](Play%20Blokus.command)
+or run `.venv/bin/blokus-rl duo-web`. The local browser app supports mouse
+placement, rotate/flip previews, undo, either seat, and Metal/MPS inference with
+CPU available. See [local play and laptop training limits](docs/local-play.md).
+
 The second Rust engine is implemented in `src/duo.rs`, with the same
 PyO3 → PyTorch → TorchRL training stack. It supports legal placements, rotations
 and flips, both starting points, forced passes, scoring bonuses, human terminal

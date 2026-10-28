@@ -138,7 +138,10 @@ def choose(game, policy, rng, *, sample=False):
             return int(actions[int(rng.choice(choices))])
         raise ValueError(f"unknown baseline: {policy}")
     state, actions, candidates = decision(game)
-    distribution, _ = policy.distribution(torch.from_numpy(state), torch.from_numpy(candidates))
+    device = next(policy.parameters()).device
+    distribution, _ = policy.distribution(
+        torch.from_numpy(state).to(device), torch.from_numpy(candidates).to(device)
+    )
     index = int(distribution.sample() if sample else distribution.mode)
     return int(actions[index])
 

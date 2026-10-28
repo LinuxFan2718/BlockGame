@@ -197,6 +197,13 @@ def main():
     duo_play.add_argument(
         "--simulations", type=int, default=0, help="PUCT simulations per bot move"
     )
+    duo_play.add_argument("--device", choices=("auto", "cpu", "mps", "cuda"), default="auto")
+    duo_eval.add_argument("--device", choices=("auto", "cpu", "mps", "cuda"), default="cpu")
+    duo_web = commands.add_parser("duo-web", help="Play a local browser game against a saved bot")
+    duo_web.add_argument("checkpoint", nargs="?", type=Path)
+    duo_web.add_argument("--device", choices=("auto", "cpu", "mps", "cuda"), default="auto")
+    duo_web.add_argument("--port", type=int, default=8765)
+    duo_web.add_argument("--no-browser", action="store_true")
     commands.add_parser("duo-report", help="Rebuild the saved Blokus experiment report")
     args = parser.parse_args()
     try:
@@ -248,11 +255,22 @@ def main():
 
             config = DuoConfig(**{field: getattr(args, field) for field in vars(DuoConfig())})
             train_duo(config, args.out, args.init)
+        elif args.command == "duo-web":
+            from .duo_web import serve
+
+            configure_torch(42)
+            serve(args.checkpoint, args.device, args.port, not args.no_browser)
         elif args.command in ("duo-evaluate", "duo-play"):
             from .duo_learning import BASELINES, evaluate_duo, load_duo, play_duo
+            from .duo_device import inference_device
 
             configure_torch(args.seed)
             policy = args.checkpoint if args.checkpoint in BASELINES else load_duo(args.checkpoint)
+            device = inference_device(args.device)
+            if not isinstance(policy, str):
+                policy.to(device)
+            if args.command == "duo-play":
+                print(f"Inference: {device} (Metal GPU)" if device.type == "mps" else f"Inference: {device}")
             if args.simulations < 0:
                 raise ValueError("simulations must be nonnegative")
             if args.simulations:
@@ -265,6 +283,8 @@ def main():
                 play_duo(policy, args.human, args.seed)
             else:
                 opponent = args.opponent if args.opponent in BASELINES else load_duo(args.opponent)
+                if not isinstance(opponent, str):
+                    opponent.to(device)
                 result = evaluate_duo(policy, opponent, args.games_per_seat, args.seed)
                 print(json.dumps(result, indent=2))
                 if args.json:
