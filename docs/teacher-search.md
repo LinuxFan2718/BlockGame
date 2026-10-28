@@ -283,3 +283,42 @@ Formatting/lint/compilation and diff checks passed. Quiet follow-up:
 finish-resumed-blokus-training-study, every 15 minutes, through the original
 held-out report only. Final provider billing must include 27 and 28 October UTC
 because this call can cross midnight UTC. No additional paid work is scheduled.
+
+## Local final-audit preparation — 27 October, 20:05 EDT
+
+Prepared `python/blokus_rl/duo_teacher_report.py` while the recovery was healthy.
+It launches no games or training. After finished.json and stopped compute, it
+checks the original interruption manifest, unchanged historical files and five
+progress rows, both executed source archives/commits, parent preservation,
+branch initialization and cumulative optimizer/gradient counters. It handles an
+unchanged selected parent at additional round 0 (embedded update 112), and a
+soft-cap final validation that occurs after the last atomic round checkpoint.
+
+The external auditor independently replays every saved action, checks book,
+seeds, seats, scores, margins and actual simulation counts, then recomputes all
+summaries and same-opening differences. Head-to-head checks cover paired
+outcomes and counters; those games have no retained action traces. Missing app
+billing is rejected instead of treated as zero cost. The final audit still needs
+the complete artifacts and provider snapshots; these preparations are not
+results from the running study.
+
+Nine regression checks passed in 2.26 seconds, including deliberate corruption
+of traces, seeds, scores and simulation counts, parent selection, final
+validation and lost optimizer steps. The same external auditor also replayed
+all 200 previously completed level-4 games and recovered their existing
+6,346,752 simulations and 33.75% score. A read-only mirror of the interrupted
+download passed the historical/source audit and recovered the $30.46767667 net
+reservation. No new remote source was uploaded or scientific setting changed.
+
+Once complete, combine the saved stopped-app snapshot for the two earlier
+attempts (`runs/teacher-search-apps-stopped-20261026.json`) with the final recovery
+snapshot: Modal's current app list can omit older stopped apps. Fetch billing
+for both UTC dates, then run locally:
+
+```sh
+MPLCONFIGDIR=.cache/matplotlib .venv/bin/python -m blokus_rl.duo_teacher_report --run <complete-download>/duo-teacher-search-1066 --apps <combined-stopped-apps.json> --billing <provider-report-27-and-28-October.json>
+```
+
+The tool writes verification.json and a complete downloaded-file hash manifest
+only after the checks pass. A final report, plot, verified backup, final costs
+and stopping the follow-up remain required after the reserved tests finish.
