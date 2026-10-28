@@ -124,3 +124,9 @@ and an image-build import check before GPU allocation. The allowlisted
 guard still refuses repeats. Including both validation reservations and the main
 8h reservation gives$22.33249, below the unchanged$23 cap. No scientific payload,
 model, replay or study setting changed.
+
+The new image-build check initially tried to import Modal itself, but the SDK is
+injected into function containers and is absent in the base image builder. This
+was caught before GPU allocation/submission; the check now verifies Python module
+discovery and compilation without depending on the injected SDK. Its build log is
+retained with `-build-check` suffix. All build costs remain included.

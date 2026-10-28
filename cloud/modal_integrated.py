@@ -36,7 +36,7 @@ image = (
     .env({"PYTHONPATH": "/opt/blokus/cloud"})
     .run_commands(
         "python /opt/integrated/payload/build_integrated.py",
-        "python -c 'import modal; modal.is_local = lambda: False; import modal_integrated; print(\"Modal runner import verified\")'",
+        'python -c \'import importlib.util, py_compile; s = importlib.util.find_spec("modal_integrated"); assert s is not None; py_compile.compile(s.origin, doraise=True); print("Modal runner path verified:", s.origin)\'',
     )
     if modal.is_local()
     else None
