@@ -31,6 +31,13 @@ def main():
     a, b = [load(ROOT / f"runs/cuda-graphs-{g}-verified.json") for g in ("l40s", "h100")]
     c = load(ROOT / "runs/cuda-latency-verified.json")
     assert all(r["verified"] for r in (a, b, c))
+    checks = [
+        check for report in (a, b) for check in load(Path(report["run"]) / "correctness.json")
+    ]
+    for layout in ("nchw", "channels-last"):
+        path = Path(c["run"]) / (layout + "-micro/micro.json")
+        if path.exists():
+            checks.extend(load(path)["correctness"])
     variants = (
         "current-eager",
         "current-graph",
@@ -56,7 +63,7 @@ def main():
         )
     lines += [
         "",
-        "![Two repetitions of each collection case and GPU-resident inference ceiling](assets/cuda-graphs-results.png)",
+        "![Two repetitions of each collection case and GPU-resident inference throughput](assets/cuda-graphs-results.png)",
         "",
         "Bars show two means; whiskers show the observed repeat range, not confidence",
         "intervals. H100 repetition 2 ran on a replacement container after preemption.",
@@ -78,6 +85,13 @@ def main():
     lines += [
         "",
         f"Best tested H100 setting: **{best_key}**, {best['games_per_second'] / base['games_per_second']:.2f}× the same-device 1 ms NCHW baseline.",
+        "There were only two collection repetitions. The 1 ms baseline ranged from",
+        f"{min(x['seconds'] for x in base['cases']):.2f} to {max(x['seconds'] for x in base['cases']):.2f} seconds, so the gain's magnitude is uncertain.",
+        "No wait won within both repetitions. Channels-last versus NCHW at 0.1 ms",
+        "changed direction between repetitions; its small mean collection gain is",
+        "mixed evidence, despite the clear bulk-inference improvement. L40S was not",
+        "tested at zero wait or channels-last, so this is not a comparison of each",
+        "GPU's globally best configuration.",
         "This is a finite diagnostic; it does not establish the globally optimal delay,",
         "live-game count or hardware configuration. Layout can alter bf16 rounding and",
         "search trajectories, so all actual simulation counts accompany game throughput.",
@@ -129,6 +143,12 @@ def main():
         "concurrency and handoff overhead. It does not identify a single kernel or",
         "establish peak FLOP/bandwidth saturation. GPU and host memory capacity were",
         "not exhausted in the successful comparisons.",
+        "The sustained batch2048 graph runs reached 100% GPU busy time on both GPUs;",
+        "that establishes continuous kernel activity, not peak hardware utilization.",
+        "No wait also reduced mean batch size from about 147 to 87 and raised padded",
+        f"neural rows from {c['latency']['nchw-1.0']['padding_factor']:.3f}× to {c['latency']['nchw-0.0']['padding_factor']:.3f}× requested rows.",
+        "Thus its higher GPU busy time includes less efficient small/padded batches,",
+        "as well as the useful increase in completed search work.",
         "",
         "### Audit, actual work and costs",
         "",
@@ -170,9 +190,16 @@ def main():
         "",
         "The native implementation passed exact ordered-state and arbitrary-prior",
         "root-statistic comparisons. GPU checks covered seven batch sizes, padded",
-        "capture equality, unpadded probabilities/values and output lifetime. Layout",
-        "checks retained identical weights; their actual errors are in the final",
-        "verification JSON. The two GPU fixtures have exactly identical arrays.",
+        "capture equality, unpadded probabilities/values and output lifetime. These",
+        f"checks recorded a maximum capture error of {max(r['same_shape_capture_max_abs_error'] for r in checks):.8g}; maximum unpadded errors were {max(r['padding_max_abs_error'][0] for r in checks):.8g} for probabilities and {max(r['padding_max_abs_error'][1] for r in checks):.8g} for values.",
+        "Channels-last retained identical weights. Maximum tested layout errors were",
+        f"{max(x['max_abs_error'][0] for x in c['layout_check']['checks']):.8g} for probabilities and {max(x['max_abs_error'][1] for x in c['layout_check']['checks']):.8g} for values.",
+        "The two GPU fixtures have exactly identical arrays.",
+        "All four final settings recorded identical measured simulation counts within",
+        "each repetition. The recorded-training-data digest differed for zero-wait",
+        "repetition 4; the other three settings matched there, and all four matched",
+        "in repetition 3. Numerical fixture checks are not proof of bitwise identity",
+        "for every collected position; no playing-strength equivalence was tested.",
         "",
         "Audits verify source/payload/native hashes, original completed-case bytes,",
         "all counters, physical padding, stopped apps and preserved certified/Blokus",
@@ -190,6 +217,9 @@ def main():
         "",
         "Full verified counters and telemetry are in `runs/cuda-graphs-l40s-verified.json`,",
         "`runs/cuda-graphs-h100-verified.json` and `runs/cuda-latency-verified.json`.",
+        "The final local archive is `.backups/cuda-graphs-complete-20261028.tar.gz`;",
+        "its `.sha256.json` sidecar lists the archive hash and every read-back-verified",
+        "member hash. CPU staging/fixture contracts passed all three targeted tests.",
         "",
         "Training remains stopped. The next implementation target is a persistent",
         "native actor/inference pipeline with more independent games and fewer",
@@ -197,6 +227,11 @@ def main():
         "Graph/layout integration into training must also verify behavior across",
         "weight updates; this study evaluated a frozen model only. No further paid",
         "experiment or training is launched automatically.",
+        "For the current small network, L40S remains the better-value measured choice:",
+        f"native+graphs/live64 cost an estimated ${a['collection']['native-graph-wide']['rate_estimated_usd_per_1000_games']:.3f} per 1,000 collected games versus ${best['rate_estimated_usd_per_1000_games']:.3f} for the best H100 diagnostic setting.",
+        "This collection-only estimate excludes setup, and L40S has not received the",
+        "same final delay/layout tuning. Do not multiply gains across different",
+        "instances/repetitions into an asserted complete-training speedup.",
         "",
     ]
     path = ROOT / "docs/cuda-graphs.md"

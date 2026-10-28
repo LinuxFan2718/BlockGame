@@ -61,7 +61,7 @@ axes[1].set_xscale("log", base=2)
 axes[1].set_xticks([32, 128, 512, 2048], [32, 128, 512, 2048])
 axes[1].set_xlabel("Neural batch size")
 axes[1].set_ylabel("Million positions / second")
-axes[1].set_title("GPU-resident inference ceiling", loc="left", fontweight="bold")
+axes[1].set_title("GPU-resident inference throughput", loc="left", fontweight="bold")
 axes[1].legend(frameon=False, fontsize=8)
 fig.suptitle(
     "Frozen Blokus Duo: graphs speed inference; the actor pipeline limits delivery",

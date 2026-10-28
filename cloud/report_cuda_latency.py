@@ -37,12 +37,49 @@ def main():
     )
     layout_check = load(run / "layout-check.json")
     assert layout_check["weights_exact"] and layout_check["model_sha256"] == MODEL_SHA
+    assert [r["rows"] for r in layout_check["checks"]] == [1, 33, 128, 256]
     settings = ((1.0, "nchw"), (0.1, "nchw"), (0.0, "nchw"))
     if finished["channels_last_enabled"]:
         assert layout_check["passed"]
         assert not (run / "layout-failure.json").exists()
         assert load(run / "channels-last-micro/micro.json")["layout"] == "channels_last"
         settings += ((0.1, "channels_last"),)
+    for layout in ("nchw", "channels-last"):
+        path = run / (layout + "-micro/micro.json")
+        if not path.exists():
+            assert layout == "channels-last" and not finished["channels_last_enabled"]
+            continue
+        micro = load(path)
+        assert micro["model_sha256"] == MODEL_SHA and micro["gradient_updates"] == 0
+        assert micro["fixture_sha256"] == ledger["fixture_sha256"] and len(micro["cases"]) == 26
+        assert [r["rows"] for r in micro["correctness"]] == [1, 9, 17, 33, 65, 127, 256]
+        for check in micro["correctness"]:
+            assert check["same_shape_capture_max_abs_error"] <= 1e-6
+            assert (
+                check["padding_max_abs_error"][0] <= 0.002
+                and check["padding_max_abs_error"][1] <= 0.02
+            )
+        for n in (32, 128, 512, 2048):
+            for method in ("eager", "graph"):
+                rows = [
+                    r
+                    for r in micro["cases"]
+                    if r["rows"] == n and r["method"] == method and not r.get("sustained")
+                ]
+                assert sorted(r["repeat"] for r in rows) == [1, 2, 3]
+        for row in micro["cases"]:
+            assert row["iterations"] > 0 and row["wall_seconds"] > 0
+            if row.get("sustained"):
+                assert row["rows"] == 2048 and row["wall_seconds"] >= 10
+            else:
+                assert row["cuda_event_seconds"] > 0
+            assert (
+                abs(
+                    row["positions_per_second"]
+                    - row["rows"] * row["iterations"] / row["wall_seconds"]
+                )
+                < 1e-6
+            )
     expected_order = [
         (rep, delay, layout)
         for rep, variants in ((3, settings), (4, tuple(reversed(settings))))

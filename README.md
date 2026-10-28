@@ -56,6 +56,13 @@ result or stronger-agent claim is available from that unfinished study.
 The implementation benchmark measured 28% less collection time with the new
 index lookup and shared-memory transport; compact checkpoints were 3.78× smaller.
 The optional neural cache stays off because it slowed this workload.
+The [CUDA Graph GPU evaluation](docs/cuda-graphs.md) increased frozen self-play
+collection throughput by 21% with graphs alone on L40S, or 81% with the native
+prototype and more concurrent games. A separate H100 probe found zero batching
+wait faster than 1 ms, but real collection used only about 21% GPU busy time.
+Bulk inference reached 100% activity; supplying useful search work remains the
+main throughput problem. These are performance measurements, not training or
+strength gains, and training remains stopped.
 See the [protocol](docs/continuation-status.md) for settings, costs and limitations.
 To play the selected agent at the fast 128-simulation budget:
 `.venv/bin/blokus-rl duo-play runs/duo-continuation-final-20261026T2007/duo-continuation-865/frozen-strong1024.pt --simulations 128`.
