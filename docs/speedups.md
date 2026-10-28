@@ -174,3 +174,8 @@ commits remain candidates, not claimed implemented gains. Subtree reuse changes
 budget accounting; asynchronous persistence needs stronger failure tests.
 Compact atomic checkpoints address the measured storage cost without weakening
 recovery guarantees.
+
+See [the further local evaluation](further-speedups.md) for the next candidates:
+corner-indexed move generation/PUCT prototypes, bulk inference handoff and a
+ranked GPU follow-up plan. Those experimental measurements do not change these
+production defaults or restart training.
