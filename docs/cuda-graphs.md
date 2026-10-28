@@ -116,10 +116,10 @@ microbenchmarks remain diagnostic evidence, not mixed into its repetitions.
 
 ## Finite follow-up specified after L40S results
 
-The corrected L40S comparison completed and verified: 78.80 seconds per384 games
-for current/eager, versus43.47 for native+graphs/live64, but GPU busy time only
-about11%, versus100% in sustained GPU-only inference. Aggregate CPU use in that
-best case was4.17 of8 cores. The source still permits up to1ms of request
+The corrected L40S comparison completed and verified: 78.80 seconds per 384 games
+for current/eager, versus 43.47 for native+graphs/live64, but GPU busy time only
+about 11%, versus 100% in sustained GPU-only inference. Aggregate CPU use in that
+best case was 4.17 of 8 cores. The source still permits up to 1 ms of request
 coalescing per small inference batch.
 
 After both original GPU stages stop and verify, one final **strict H100** call
@@ -132,8 +132,45 @@ that same final device; layout and coalescing effects remain separate.
 
 This is a single finite follow-up, not an adaptive training or opponent study.
 It has a780-second hard limit,8 capped cores/24GiB, retries0/max1container,
-and one-shot ledger. Settle the two stopped stages to their actual provider
+and one-shot ledger. Settle all stopped attempts to their actual provider
 costs before reserving another870 seconds at the current H100 rate plus$0.05
-startup allowance. The launcher refuses if **all four apps' actual costs plus
-the new reservation exceed the original$5 cap**, or the$50 reserve would be
+startup allowance. The launcher refuses if **all prior apps' actual costs plus
+the new reservation exceed the original $5 cap**, or the $50 reserve would be
 touched. No larger GPU run, new model or training follows automatically.
+
+## H100 preemption and remaining-case recovery
+
+Modal preempted `ap-pcbKy7PHqSUn8AsUyZG4xD` after all five repetition-1 cases
+had committed. Its infrastructure restart hit the exclusive directory guard
+and stopped; no completed case was replayed. The original app stopped at
+01:10:48 EDT on 28 October, with $0.75591184 metered in the settled snapshot.
+Its complete committed directory and provider log are preserved in
+`runs/cuda-graphs-h100-preempted-20261028T051312Z/` and a member-verified backup
+`.backups/cuda-graphs-h100-preempted-20261028.tar.gz`.
+
+The manual recovery `ap-mbrn9DixNlWr92KRii382x` uses the same immutable image,
+weights, fixture and benchmark source and runs **only the five missing
+repetition-2 cases**, with a 900-second hard limit. Its $1.26811 reservation
+plus the stopped H100's actual cost fits the original H100 allocation. An
+exclusive recovery directory blocks another infrastructure replay. The old
+execution, failure and completed case bytes remain unchanged; timestamps and
+telemetry from the original and replacement containers are audited separately.
+This means the two H100 repetitions span two hardware instances. Original
+failed/preempted attempts remain included in the phase cost.
+
+## What utilization can establish
+
+The reported GPU utilization is the fraction of sampled time with a kernel
+running, and memory utilization is an activity-time indicator. Neither measures
+the percentage of peak FLOPs, Tensor Core throughput or peak memory bandwidth.
+See [NVIDIA's nvidia-smi definitions](https://docs.nvidia.com/deploy/nvidia-smi/index.html).
+We therefore distinguish a continuously busy inference service from a
+fully utilized H100. No Nsight hardware-counter profile was collected.
+
+CUDA Graphs reduce host launch work by replaying a captured operation sequence;
+they do not remove search dependencies or automatically supply bigger batches.
+The implementation follows [PyTorch's capture and memory-lifetime requirements](https://docs.pytorch.org/docs/2.14/notes/cuda.html).
+Channels-last is a separate convolution layout optimization, recommended with
+mixed precision in [PyTorch's tuning guide](https://docs.pytorch.org/tutorials/recipes/recipes/tuning_guide.html).
+Its measured value here must come from the same-device diagnostic, rather than
+assuming an H100 or a layout change is faster.
