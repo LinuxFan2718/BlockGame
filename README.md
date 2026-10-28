@@ -75,6 +75,10 @@ level 4. All 1,200 external traces were replayed; the 800 head-to-head outcomes
 and counters were audited without saved traces. All app attempts metered $6.83;
 compute is stopped. Replication is recommended before scaling. The report records
 the actual 08:47–11:18 EDT morning run, which did not start overnight.
+The authorized [fresh-seed control replication](docs/control-replication.md)
+was submitted at 11:53 EDT, using the original parent, the cheaper 1,024-search
+training recipe and a fresh held-out book. Its result is pending; the $11 phase
+ceiling preserves the existing $50 credit reserve.
 See the [protocol](docs/continuation-status.md) for settings, costs and limitations.
 To play the earlier preserved parent at the fast 128-simulation budget:
 `.venv/bin/blokus-rl duo-play runs/duo-continuation-final-20261026T2007/duo-continuation-865/frozen-strong1024.pt --simulations 128`.

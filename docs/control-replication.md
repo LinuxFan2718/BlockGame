@@ -97,3 +97,33 @@ attempts, stopped apps and preserved models. Back up with
 `cloud/backup_control_replication.py --name <unused> --run <download-parent>`;
 every archive member must pass SHA256 readback. Commit locally without pushing,
 report the final result here, and delete the completion follow-up.
+
+## Launch and follow-up
+
+Submitted **28 October 2026 at 11:53 EDT** (15:53 UTC):
+
+- App `ap-oDPcA20WshoYQlqxcurDXF`; call `fc-01M61KFFT1D23GBPCZQJJP7PV6`.
+- Run `duo-control-replication-1071`, profile `linuxfan2718`, existing private
+  Volume `blokus-deep-selfplay-20261026`.
+- Executed source commit `f4a3dd5eae44537731c4e37dd01ee93ee353d1e7`.
+- Provider confirmed the exact child SDK/Volume commit probe and started the
+  independent control branch. One active container; previous study stopped.
+- Offline paid-launch guard tests: four passed. Only the three declared seed
+  fields differ from the earlier control configuration; new validation/test books
+  do not overlap that run's books. All 35 protected checkpoint hashes passed.
+  The initial replay-content digest was checked locally, and report/plot generation
+  passed a temporary historical-fixture smoke test; that fixture is not new evidence.
+- Reservation is $10.29461 under the $11 ceiling. Actual metering is reported at
+  completion. Expected work is roughly 75–100 minutes based on the earlier run;
+  this is an estimate, with a four-hour maximum function lifetime.
+- A quiet completion follow-up audits, reports, backs up and commits the result,
+  then deletes itself. Partial training/validation scores are not final evidence.
+
+Startup verification at **11:56 EDT** read committed initialization/status records:
+parent tensors, all inherited replay content/order, empty AdamW state and fresh
+CPU/NumPy RNG matched locally; one CUDA RNG state was retained. Three rounds /
+768 new games were committed. These are health/counter checks, not strength
+results. Snapshot: `runs/control-replication-startup-snapshot-20261028T155635Z/`.
+Initial source/receipt backup `.backups/control-replication-startup-20261028.tar.gz`
+read back all 41 members successfully (SHA256
+`e24466e8b1620d8848eb2919860dcc0656f2b851e8bff22c0214e45372193874`).
