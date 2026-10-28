@@ -113,3 +113,27 @@ $0.25 allowance for the stopped attempt and $0.25 for image build/startup.
 The corrected run is `duo-cuda-graphs-1069-r1`, with separate `-r1` ledgers and
 payload archive. It repeats the comparisons with the corrected loader; initial
 microbenchmarks remain diagnostic evidence, not mixed into its repetitions.
+
+## Finite follow-up specified after L40S results
+
+The corrected L40S comparison completed and verified: 78.80 seconds per384 games
+for current/eager, versus43.47 for native+graphs/live64, but GPU busy time only
+about11%, versus100% in sustained GPU-only inference. Aggregate CPU use in that
+best case was4.17 of8 cores. The source still permits up to1ms of request
+coalescing per small inference batch.
+
+After both original GPU stages stop and verify, one final **strict H100** call
+may test delay1/0.1/0ms at unchanged live64/full1024/fast32 settings, repeats3/4
+in reversed order. Based on the H100's unexpectedly slower initial NCHW
+microbenchmark, it also checks channels-last layout at0.1ms: identical weights,
+explicit output comparisons against NCHW, and inclusion only if the same
+probability/value tolerances pass. GPU-only NCHW and channels-last tests run on
+that same final device; layout and coalescing effects remain separate.
+
+This is a single finite follow-up, not an adaptive training or opponent study.
+It has a780-second hard limit,8 capped cores/24GiB, retries0/max1container,
+and one-shot ledger. Settle the two stopped stages to their actual provider
+costs before reserving another870 seconds at the current H100 rate plus$0.05
+startup allowance. The launcher refuses if **all four apps' actual costs plus
+the new reservation exceed the original$5 cap**, or the$50 reserve would be
+touched. No larger GPU run, new model or training follows automatically.

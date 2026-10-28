@@ -23,15 +23,22 @@ def sha(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
-def telemetry(run):
+def telemetry(run, *, recursive=False, allow_incomplete=False):
     phases = {}
-    for line in (run / "phases.jsonl").read_text().splitlines():
-        row = json.loads(line)
-        assert row["event"] not in phases.setdefault(row["phase"], {})
-        phases[row["phase"]][row["event"]] = row["monotonic"]
+    phase_files = sorted(run.rglob("phases.jsonl")) if recursive else [run / "phases.jsonl"]
+    for path in phase_files:
+        prefix = "" if path.parent == run else str(path.parent.relative_to(run)) + "/"
+        for line in path.read_text().splitlines():
+            row = json.loads(line)
+            name = prefix + row["phase"]
+            assert row["event"] not in phases.setdefault(name, {})
+            phases[name][row["event"]] = row["monotonic"]
     samples = [json.loads(line) for line in (run / "telemetry.jsonl").read_text().splitlines()]
     report = {}
     for name, span in phases.items():
+        if set(span) != {"start", "end"} and allow_incomplete:
+            report[name] = {"samples": 0, "incomplete": True}
+            continue
         assert set(span) == {"start", "end"} and span["end"] >= span["start"]
         trim = 1.2 if span["end"] - span["start"] >= 3 else 0
         selected = [
@@ -82,16 +89,43 @@ def main():
     ledger = load(ROOT / f"runs/modal-cuda-graphs-{args.gpu}-r1-cost-ledger.jsonl")
     assert execution == ledger and execution["gpu"] == args.gpu
     assert not (run / "failure.json").exists()
+    recovery = (
+        load(run / "recovery-execution.json")
+        if (run / "recovery-execution.json").exists()
+        else None
+    )
+    app_ids = [args.app_id]
+    if recovery:
+        assert args.gpu == "h100" and not (run / "recovery-failure.json").exists()
+        assert recovery == load(ROOT / "runs/modal-cuda-h100-recovery-cost-ledger.jsonl")
+        assert sha(ROOT / "cloud/modal_cuda_recovery.py") == recovery["runner_sha256"]
+        app_ids.append(recovery["prior_app_id"])
+        assert "H100" in load(run / "recovery-hardware.json")["gpu"]
+        for name, h in recovery["preserved_files"].items():
+            target = (
+                run / "initial-run" / name
+                if name in ("phases.jsonl", "telemetry.jsonl", "failure.json")
+                else run / name
+            )
+            assert sha(target) == h, name
+        for c in load(run / "recovery-correctness.json"):
+            assert c["same_shape_capture_max_abs_error"] <= 1e-6
+            assert c["padding_max_abs_error"][0] <= 0.002 and c["padding_max_abs_error"][1] <= 0.02
     assert sha(ROOT / "cloud/modal_cuda_benchmark.py") == execution["runner_sha256"]
     for name, h in execution["payload_sha256"].items():
         assert sha(ROOT / "runs/duo-cuda-payload-r1" / name) == h
     apps = load(args.apps)
     assert all(int(a["tasks"]) == 0 for a in apps)
-    assert any(a["app_id"] == args.app_id and a["state"] == "stopped" for a in apps)
+    assert all(
+        any(a["app_id"] == app_id and a["state"] == "stopped" for a in apps) for app_id in app_ids
+    )
     finish = load(run / "finished.json")
     hardware = load(run / "hardware.json")
     assert finish["model_sha256"] == MODEL_SHA and finish["source_resume_sha256"] == RESUME_SHA
     assert finish["gradient_updates"] == 0 and 0 < finish["seconds"] < 1800
+    if recovery:
+        assert finish["preserved_case_count"] == finish["recovered_case_count"] == 5
+        assert finish["seconds"] < recovery["timeout_seconds"]
     assert ("L40S" if args.gpu == "l40s" else "H100") in hardware["gpu"]
     build = load(run / "native-build.json")
     for name, h in build["optimized_source_sha256"].items():
@@ -217,7 +251,7 @@ def main():
     costs = {}
     for row in load(args.billing):
         costs[row["object_id"]] = costs.get(row["object_id"], Decimal(0)) + Decimal(row["cost"])
-    actual = costs[args.app_id]
+    actual = sum(costs[name] for name in app_ids)
     assert 0 < actual < Decimal("4.19642")
     stop = ROOT / Path((ROOT / "runs/duo-teacher-user-stopped-current.txt").read_text().strip())
     preserved = load(stop / "stop-verified.json")
@@ -225,13 +259,21 @@ def main():
         assert sha(ROOT / name) == h
     for branch, row in preserved["retained"].items():
         assert sha(stop / "duo-teacher-search-1066" / branch / "resume.pt") == row["resume_sha256"]
+    resources = telemetry(run)
+    if recovery:
+        old_resources = telemetry(run / "initial-run", allow_incomplete=True)
+        resources.update({"initial-run/" + name: value for name, value in old_resources.items()})
     report = {
         "verified": True,
         "gpu": args.gpu,
         "app_id": args.app_id,
+        "app_ids": app_ids,
+        "hardware_instances": [hardware]
+        + ([load(run / "recovery-hardware.json")] if recovery else []),
+        "recovered_after_preemption": bool(recovery),
         "run": str(run.resolve()),
         "collection": aggregate,
-        "telemetry_by_phase": telemetry(run),
+        "telemetry_by_phase": resources,
         "metered_usd": str(actual),
         "combined_reservation_usd": execution["combined_reserved_usd"],
         "model_sha256": MODEL_SHA,
