@@ -1,9 +1,15 @@
 # Integrated speedups and fresh controlled run — 28 October 2026
 
-**Morning status:** the requested overnight training run did **not** start overnight.
-Local verification was complete at 08:08 EDT; GPU validation began successfully at
-08:32 EDT. The full study is waiting for that validation to finish. All times here
-are actual client dates in EDT; provider billing uses UTC.
+**Morning status at 08:51 EDT:** the speedups are implemented and verified. The
+fresh full study started at **08:47 EDT** and has completed its first three saved
+control rounds (768 games). The requested overnight training did **not** start
+overnight. Held-out strength results are still pending. All client times here are
+EDT on 28 October 2026; provider billing uses UTC.
+
+The integrated pipeline uses Rust move/search improvements, compact indices,
+bulk shared-memory inference, ready batching and CUDA Graphs. Bulk staging adds
+**18.7% / 27.1% throughput** at full-search 1,024 / 2,048 over the already
+Rust-optimized, graphed legacy-row path. The local and GPU checks below passed.
 
 ## What changed
 
@@ -136,7 +142,7 @@ prior commitment conservatively at $46.25. No top-up or plan change.
 | `ap-tUfMbBe5gfBIYvlmZ3wD25` | Runner import failed before study code. Explicitly stopped; runner moved to established cloud-module path. |
 | `ap-TSgLReotCBET6Pvijbc13n` | Image import test depended on runtime-injected SDK; caught before GPU submission. Build test now checks discovery/compilation. |
 | `ap-CioAB9zwQl4m3qfaDzvsrf` | Native comparison passed, then child PYTHONPATH omitted injected SDK. Failed before numerical checks or training. |
-| `ap-oOQqAsXkZ1Zg1czJgwIxza` | Corrected validation: child SDK import and mounted Volume commit verified before scientific work. Active run `duo-integrated-validation-1070-sdk`. |
+| `ap-oOQqAsXkZ1Zg1czJgwIxza` | Corrected validation: child SDK import and mounted Volume commit verified before scientific work. Finished run `duo-integrated-validation-1070-sdk`; locally verified and stopped with zero tasks. |
 
 All earlier attempts are stopped with zero tasks. Their logs, source receipts,
 costs and failed run artifacts are preserved. The payload/scientific settings did
@@ -192,3 +198,29 @@ Whole-validation telemetry (126 samples, including startup, numerical checks and
 
 All these validation/build/startup apps were stopped with zero tasks before the main study launch. Actual costs can settle later; the final billing report must refresh them.
 
+
+## Full study launch and follow-up
+
+- App: `ap-6udDwXXAr6DC6c49IVqVv7`.
+- Function call: `fc-01M618TANN52C02880107VA7TE`.
+- Source commit: `382251d8f2389342ccbd4bee1faff79848db27f9`.
+- Submitted 08:47 EDT. Provider logs confirmed child SDK/Volume access, branch
+  initialization and three saved control rounds: 256, 512 and 768 games. Round
+  times were 31.26, 25.67 and 25.42 seconds, including training/checkpoint work.
+- One active study; all validation/startup apps stopped. Net reservations are
+  $22.27935333 under the unchanged $23 ceiling. This is separate from actual spend.
+- The shared follow-up checks completion and runs the prepared independent audit,
+  report and backup. It stays quiet for ordinary progress and validation scores,
+  reports completion/failure/action, and deletes itself when work is finished.
+
+The complete study may take several hours; its function has an eight-hour hard
+limit. The three early training rounds are progress evidence, not a new strength
+result. The earlier intentionally stopped study was not resumed or overwritten.
+
+The throughput comparison also helps locate the remaining bottleneck: all three
+modes use the same captured neural kernels, yet changing host-side staging and
+request/reply handling improves game throughput. Together with the earlier
+profile and low broad-sample GPU activity, this points to feeding and coordinating
+search work as the remaining constraint. It does not prove that a particular CPU
+function dominates, and an idle GPU does not require every CPU core to be busy.
+Larger GPU capacity alone has not improved this workload economically.

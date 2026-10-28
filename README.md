@@ -65,7 +65,7 @@ main throughput problem. These are performance measurements, not training or
 strength gains. The [integrated production pipeline](docs/integrated-overnight.md)
 passed 96 Python tests, exact native comparisons and GPU numerical/recovery checks.
 Bulk inference added 18.7% / 27.1% throughput at full-search 1,024 / 2,048 over
-the graphed Rust baseline. A fresh matched training study is authorized with the
+the graphed Rust baseline. A fresh matched training study started on 28 October at 08:47 EDT with the
 measured runtime; its held-out learning results are pending. The requested
 overnight training did not start overnight; the report records actual launch times.
 See the [protocol](docs/continuation-status.md) for settings, costs and limitations.
