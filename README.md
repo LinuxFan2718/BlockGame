@@ -62,7 +62,12 @@ prototype and more concurrent games. A separate H100 probe found zero batching
 wait faster than 1 ms, but real collection used only about 21% GPU busy time.
 Bulk inference reached 100% activity; supplying useful search work remains the
 main throughput problem. These are performance measurements, not training or
-strength gains, and training remains stopped.
+strength gains. The [integrated production pipeline](docs/integrated-overnight.md)
+passed 96 Python tests, exact native comparisons and GPU numerical/recovery checks.
+Bulk inference added 18.7% / 27.1% throughput at full-search 1,024 / 2,048 over
+the graphed Rust baseline. A fresh matched training study is authorized with the
+measured runtime; its held-out learning results are pending. The requested
+overnight training did not start overnight; the report records actual launch times.
 See the [protocol](docs/continuation-status.md) for settings, costs and limitations.
 To play the selected agent at the fast 128-simulation budget:
 `.venv/bin/blokus-rl duo-play runs/duo-continuation-final-20261026T2007/duo-continuation-865/frozen-strong1024.pt --simulations 128`.

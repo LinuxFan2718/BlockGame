@@ -217,6 +217,10 @@ def audit(run, apps_path, app_id, billing_path):
     require(
         validation["passed"] and validation["payload_sha256"] == manifest, "validation mismatched"
     )
+    require(
+        read(run / "native-build.json") == read(Path(validation["run"]) / "native-build.json"),
+        "native build differs from validated binary",
+    )
     protocol, heldout, finished = [
         read(run / (n + ".json")) for n in ("study-protocol", "heldout-protocol", "finished")
     ]
@@ -376,6 +380,7 @@ def audit(run, apps_path, app_id, billing_path):
             app = row["object_id"]
             costs[app] = str(Decimal(costs.get(app, "0")) + Decimal(str(row["cost"])))
     require(app_id in costs and validation["app_id"] in costs, "billing omits successful compute")
+    require(sum(Decimal(v) for v in costs.values()) <= 23, "actual phase metering exceeds cap")
     primary = differences["teacher2048-minus-parent-pentobi4"]["nominal_paired_95pct_interval"]
     return {
         "run": str(run.resolve()),

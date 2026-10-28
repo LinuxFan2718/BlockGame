@@ -39,6 +39,8 @@ def main():
             row = result["external"][f"{name}-pentobi{level}"]
             center = row["score_rate"] * 100
             limits = np.asarray(row["score_rate_95pct_cluster_bootstrap"]) * 100
+            if row.get("zero_score_one_sided_95_upper") is not None:
+                limits[1] = row["zero_score_one_sided_95_upper"] * 100
             y.append(center)
             lo.append(center - limits[0])
             hi.append(limits[1] - center)
@@ -84,7 +86,7 @@ def main():
         ax.spines[["top", "right"]].set_visible(False)
     fig.suptitle("Fresh seed1070: held-out results at equal2,048 playing simulations")
     fig.supxlabel(
-        "100 whole-opening pairs; nominal95% bootstrap intervals; one parent/training seed",
+        "100 opening pairs; nominal95% intervals (zero scores: one-sided upper); one training seed",
         fontsize=9,
     )
     figure = ROOT / "docs/assets/integrated-training-results.png"

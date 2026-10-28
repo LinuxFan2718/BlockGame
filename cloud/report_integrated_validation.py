@@ -3,15 +3,29 @@
 import argparse
 import hashlib
 import json
+import subprocess
 from pathlib import Path
 
 import numpy as np
+import torch
 
 ROOT = Path(__file__).resolve().parent.parent
 
 
 def read(path):
     return json.loads(Path(path).read_text())
+
+
+def same(a, b):
+    if isinstance(a, torch.Tensor):
+        return torch.equal(a, b)
+    if isinstance(a, np.ndarray):
+        return np.array_equal(a, b)
+    if isinstance(a, dict):
+        return a.keys() == b.keys() and all(same(v, b[k]) for k, v in a.items())
+    if isinstance(a, (tuple, list)):
+        return len(a) == len(b) and all(same(x, y) for x, y in zip(a, b, strict=True))
+    return a == b
 
 
 def main():
@@ -25,6 +39,8 @@ def main():
     assert all(int(a["tasks"]) == 0 for a in apps)
     assert any(a["app_id"] == args.app_id and a["state"] == "stopped" for a in apps)
     assert not (root / "failure.json").exists()
+    hardware = read(root / "hardware.json")
+    assert "L40S" in hardware["gpu"] and hardware["cpu_cap"] == 8 and hardware["ram_gib_cap"] == 24
     assert read(root / "wrapper-finished.json")["seconds"] < 1200
     execution = read(root / "execution.json")
     ledger = [
@@ -32,6 +48,10 @@ def main():
         for line in (ROOT / "runs/modal-integrated-cost-ledger.jsonl").read_text().splitlines()
     ]
     assert execution == next(r for r in ledger if r["stage"] == execution["stage"])
+    committed = subprocess.check_output(
+        ["git", "show", execution["source_commit"] + ":cloud/modal_integrated.py"], cwd=ROOT
+    )
+    assert hashlib.sha256(committed).hexdigest() == execution["runner_sha256"]
     manifest = read(ROOT / "runs/integrated-payload-1070-sha256.json")
     assert execution["payload_sha256"] == manifest
     for name, expected in manifest.items():
@@ -55,6 +75,22 @@ def main():
             assert c["max_abs_error"][0] <= 0.002 and c["max_abs_error"][1] <= 0.02
     assert numerical["discarded_gradient_steps"] == 2
     assert read(checks / "recovery-check.json")["exact_single_worker_gpu_recovery"]
+    left, right = [
+        torch.load(checks / name / "resume.pt", map_location="cpu", weights_only=False)
+        for name in ("uninterrupted", "recovered")
+    ]
+    for name in (
+        "model_state",
+        "optimizer",
+        "numpy_rng",
+        "torch_rng",
+        "cuda_rng",
+        "replay",
+        "best_checkpoint",
+    ):
+        assert same(left[name], right[name]), name
+    assert left["round"] == right["round"] == 2 and left["games"] == right["games"] == 8
+    del left, right
     finished = read(checks / "finished.json")
     assert (
         finished["model_sha256"]

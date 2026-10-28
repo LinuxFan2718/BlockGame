@@ -12,7 +12,7 @@ import numpy as np
 ROOT = Path(__file__).resolve().parent.parent
 verified = json.loads((ROOT / "runs/integrated-validation-verified.json").read_text())
 rows = json.loads((Path(verified["run"]) / "checks/finished.json").read_text())["cases"]
-fig, axes = plt.subplots(1, 2, figsize=(8.8, 3.7), constrained_layout=True)
+fig, axes = plt.subplots(1, 2, figsize=(8.8, 4.0), constrained_layout=True)
 colors = {"legacy": "#718096", "compact": "#277c9e", "bulk": "#b46a39"}
 for i, (mode, color) in enumerate(colors.items()):
     x = np.arange(2) + (i - 1) * 0.23
@@ -23,7 +23,9 @@ for i, (mode, color) in enumerate(colors.items()):
             256 / (r["metrics"]["collect_seconds"] + r["metrics"]["graph_capture_seconds"])
             for r in group
         ]
-        center = float(np.mean(values))
+        center = 256 / np.mean(
+            [r["metrics"]["collect_seconds"] + r["metrics"]["graph_capture_seconds"] for r in group]
+        )
         speeds.append(center)
         lower.append(center - min(values))
         upper.append(max(values) - center)
@@ -43,7 +45,8 @@ axes[1].set_ylabel("Mean actual inference batch")
 axes[0].legend(frameon=False, fontsize=8)
 fig.suptitle("Integrated L40S pipeline: frozen-model collection", fontsize=13)
 fig.supxlabel(
-    "256 measured games × 2 reversed-order repeats; whiskers show repeat range", fontsize=9
+    "20% full search / 80% fast32\n256 measured games × 2 reversed-order repeats; whiskers show repeat range",
+    fontsize=9,
 )
 out = ROOT / "docs/assets/integrated-validation.png"
 out.parent.mkdir(exist_ok=True)
