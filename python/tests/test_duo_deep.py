@@ -12,6 +12,7 @@ from blokus_rl.duo_learning import load_duo, save_duo
 from blokus_rl.duo_mcts import evaluate_records
 from blokus_rl.duo_model import DuoActorCritic
 from blokus_rl.duo_pentobi import DEFAULT_BINARY
+from blokus_rl.duo_replay import replay_records
 from blokus_rl.duo_residual import DuoResidualActorCritic, candidate_indices_numpy
 from blokus_rl.duo_shared import SharedSearchPool, collect, evaluate_indexed, indexed
 from blokus_rl.learning import configure_torch
@@ -128,13 +129,20 @@ def test_batched_raw_evaluation_matches_sequential_reference():
     ]
 
 
-def test_deep_resume_preserves_learning_state(tmp_path):
+@pytest.mark.parametrize("legacy_replay", (False, True))
+def test_deep_resume_preserves_learning_state(tmp_path, legacy_replay):
     configure_torch(764)
     config = small_config()
     reference = tmp_path / "reference.pt"
     save_duo(reference, DuoActorCritic(16), config, 0)
     train(config, tmp_path / "full", reference)
     train(config, tmp_path / "interrupted", reference, stop_after_round=1)
+    if legacy_replay:
+        path = tmp_path / "interrupted/resume.pt"
+        saved = torch.load(path, weights_only=False)
+        saved["replay"] = replay_records(saved["replay"])
+        saved.pop("resume_format_version", None)
+        torch.save(saved, path)
     # A crash can leave an ahead-of-resume selected file. The atomic round bundle
     # owns selection as well as optimizer/model/replay state.
     save_duo(tmp_path / "interrupted/best.pt", DuoActorCritic(16), config, 999)

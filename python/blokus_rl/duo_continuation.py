@@ -14,6 +14,7 @@ import torch
 
 from .duo_deep import atomic_json
 from .duo_learning import load_duo
+from .duo_replay import replay_length
 from .learning import configure_torch
 
 
@@ -50,13 +51,16 @@ def initialize_branch(config, out, reference, source_resume, *, selected_best=Fa
         not torch.equal(value, expected[key]) for key, value in weights.items()
     ):
         raise ValueError("source resume weights do not match the frozen reference")
-    if len(saved["replay"]) > config.replay_positions:
+    if replay_length(saved["replay"]) > config.replay_positions:
         raise ValueError("fork would silently truncate inherited replay")
     if any(group["lr"] != config.learning_rate for group in saved["optimizer"]["param_groups"]):
         raise ValueError("fork learning rate does not match inherited optimizer")
     reference_hash, source_hash = sha256(reference), sha256(source_resume)
     configure_torch(config.seed)
     state = dict(saved)
+    # A new branch chooses its runtime. Later exact recovery within that branch
+    # checks the runtime recorded in its own atomic checkpoint.
+    state.pop("runtime", None)
     if selected_best:
         state["model_state"] = weights
         state["optimizer"] = torch.optim.AdamW(
@@ -86,7 +90,7 @@ def initialize_branch(config, out, reference, source_resume, *, selected_best=Fa
             "source_resume_sha256": source_hash,
             "parent_round": saved["round"],
             "parent_games": saved["games"],
-            "inherited_replay_positions": len(saved["replay"]),
+            "inherited_replay_positions": replay_length(saved["replay"]),
             "selected_parent_update": torch.load(reference, map_location="cpu", weights_only=True)[
                 "update"
             ],

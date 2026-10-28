@@ -16,6 +16,7 @@ import numpy as np
 import torch
 
 from ._native import DuoGame
+from .duo_inference import FrozenEvaluationCache, InferenceBuffer
 from .duo_mcts import search_games
 from .duo_residual import candidate_indices_numpy
 from .learning import configure_torch
@@ -67,15 +68,22 @@ def evaluate_indexed(model, records, precision="float32"):
 
 
 class RemoteEvaluator:
-    def __init__(self, worker, requests, responses):
+    def __init__(self, worker, requests, responses, buffer=None):
         self.worker, self.requests, self.responses = worker, requests, responses
+        self.buffer = buffer
         self.sequence = 0
 
     def __call__(self, records):
         sequence = self.sequence
         self.sequence += 1
-        self.requests.put(("evaluate", self.worker, sequence, indexed(records)))
-        reply_sequence, probabilities, values = self.responses.get(timeout=180)
+        if self.buffer is None:
+            self.requests.put(("evaluate", self.worker, sequence, indexed(records)))
+            reply_sequence, probabilities, values = self.responses.get(timeout=180)
+        else:
+            self.buffer.write_request(indexed(records))
+            self.requests.put(("evaluate_shm", self.worker, sequence, len(records)))
+            reply_sequence, width = self.responses.get(timeout=180)
+            probabilities, values = self.buffer.read_response(len(records), width)
         if reply_sequence != sequence:
             raise RuntimeError("inference response ordering mismatch")
         return probabilities, values
@@ -111,9 +119,7 @@ def collect(config, seed, count, evaluator):
                         histories[i].append(
                             {
                                 "observation": result.observation,
-                                "indices": candidate_indices_numpy(result.candidates).astype(
-                                    np.uint16
-                                ),
+                                "indices": result.indices,
                                 "visits": result.visits.astype(np.uint16),
                                 "player": games[i].current_player,
                             }
@@ -139,9 +145,10 @@ def collect(config, seed, count, evaluator):
     return records, scores, metrics
 
 
-def worker_main(worker, config, tasks, requests, responses):
+def worker_main(worker, config, tasks, requests, responses, buffer_descriptor=None):
     configure_torch(config.seed + worker)
-    evaluator = RemoteEvaluator(worker, requests, responses)
+    buffer = InferenceBuffer(**buffer_descriptor) if buffer_descriptor else None
+    evaluator = RemoteEvaluator(worker, requests, responses, buffer)
     try:
         while (task := tasks.get()) is not None:
             round_, count = task
@@ -150,31 +157,49 @@ def worker_main(worker, config, tasks, requests, responses):
             requests.put(("done", worker, result))
     except BaseException:
         requests.put(("error", worker, traceback.format_exc()))
+    finally:
+        if buffer is not None:
+            buffer.close()
 
 
 class SharedSearchPool:
-    def __init__(self, config):
+    def __init__(self, config, *, transport="shared_memory", cache_entries=0):
+        if transport not in ("queue", "shared_memory"):
+            raise ValueError("unknown inference transport")
         self.config = config
+        self.transport, self.cache_entries = transport, cache_entries
         self.context = mp.get_context("spawn")
         self.requests = self.context.Queue(maxsize=config.workers * 2)
         self.tasks = [self.context.Queue(maxsize=1) for _ in range(config.workers)]
         self.responses = [self.context.Queue(maxsize=1) for _ in range(config.workers)]
         self.processes = []
+        self.buffers = []
 
     def __enter__(self):
-        for worker in range(self.config.workers):
-            process = self.context.Process(
-                target=worker_main,
-                args=(
-                    worker,
-                    self.config,
-                    self.tasks[worker],
-                    self.requests,
-                    self.responses[worker],
-                ),
-            )
-            process.start()
-            self.processes.append(process)
+        try:
+            for worker in range(self.config.workers):
+                buffer = (
+                    InferenceBuffer(self.config.inference_batch)
+                    if self.transport == "shared_memory"
+                    else None
+                )
+                self.buffers.append(buffer)
+                process = self.context.Process(
+                    target=worker_main,
+                    args=(
+                        worker,
+                        self.config,
+                        self.tasks[worker],
+                        self.requests,
+                        self.responses[worker],
+                        buffer.descriptor() if buffer else None,
+                    ),
+                )
+                process.start()
+                self.processes.append(process)
+        except BaseException as error:
+            self.__exit__(type(error))
+            raise
         return self
 
     def __exit__(self, exception_type, *args):
@@ -193,6 +218,9 @@ class SharedSearchPool:
         for channel in [self.requests, *self.tasks, *self.responses]:
             channel.cancel_join_thread()
             channel.close()
+        for buffer in self.buffers:
+            if buffer is not None:
+                buffer.close()
 
     def collect(self, model, round_, count):
         config = self.config
@@ -200,6 +228,9 @@ class SharedSearchPool:
             n = count // config.workers + int(worker < count % config.workers)
             task.put((round_, n))
         completed, metrics = {}, {"gpu_batches": 0, "gpu_positions": 0, "inference_seconds": 0.0}
+        # The model is frozen throughout collection. A new cache on every call
+        # prevents any evaluation from surviving an intervening gradient update.
+        cache = FrozenEvaluationCache(self.cache_entries)
         started = time.monotonic()
 
         def receive(timeout):
@@ -220,6 +251,9 @@ class SharedSearchPool:
                     raise RuntimeError("duplicate worker completion")
                 completed[message[1]] = message[2]
                 return None
+            if message[0] == "evaluate_shm":
+                _, worker, sequence, count = message
+                return ("evaluate", worker, sequence, self.buffers[worker].read_request(count))
             if message[0] != "evaluate":
                 raise RuntimeError("unknown worker message")
             return message
@@ -249,13 +283,17 @@ class SharedSearchPool:
             start = time.monotonic()
             for offset in range(0, len(rows), config.inference_batch):
                 subset = rows[offset : offset + config.inference_batch]
-                p, v = evaluate_indexed(model, subset, config.precision)
+                p, v, counters = cache.evaluate(
+                    subset, lambda rows: evaluate_indexed(model, rows, config.precision)
+                )
                 probabilities.extend(
                     p[i, : len(row["indices"])].copy() for i, row in enumerate(subset)
                 )
                 values.extend(v.tolist())
-                metrics["gpu_batches"] += 1
-                metrics["gpu_positions"] += len(subset)
+                metrics["gpu_batches"] += int(counters["cache_misses"] > 0)
+                metrics["gpu_positions"] += counters["cache_misses"]
+                for key, value in counters.items():
+                    metrics[key] = metrics.get(key, 0) + value
             metrics["inference_seconds"] += time.monotonic() - start
             offset = 0
             for _, worker, sequence, request_rows in batch_requests:
@@ -264,9 +302,12 @@ class SharedSearchPool:
                 padded = np.zeros((end - offset, width), dtype=np.float32)
                 for i, p in enumerate(probabilities[offset:end]):
                     padded[i, : len(p)] = p
-                self.responses[worker].put(
-                    (sequence, padded, np.asarray(values[offset:end], dtype=np.float32))
-                )
+                value_array = np.asarray(values[offset:end], dtype=np.float32)
+                if self.buffers[worker] is None:
+                    self.responses[worker].put((sequence, padded, value_array))
+                else:
+                    width = self.buffers[worker].write_response(padded, value_array)
+                    self.responses[worker].put((sequence, width))
                 offset = end
         records, scores = [], []
         for worker in range(config.workers):

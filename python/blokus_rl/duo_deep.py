@@ -17,6 +17,7 @@ from .duo_conv import DuoConvActorCritic
 from .duo_crossplay import opening_book
 from .duo_deep_evaluate import evaluate_many
 from .duo_learning import load_duo, save_duo
+from .duo_replay import pack_replay, replay_records
 from .duo_residual import DuoResidualActorCritic
 from .duo_shared import SharedSearchPool, pack_indexed, precision_context
 from .learning import configure_torch
@@ -112,8 +113,22 @@ def atomic_json(path, value):
     temporary.replace(path)
 
 
-def train(config, out, reference, *, resume=False, commit=None, stop_after_round=None):
+def train(
+    config,
+    out,
+    reference,
+    *,
+    resume=False,
+    commit=None,
+    stop_after_round=None,
+    inference_transport="shared_memory",
+    inference_cache_entries=0,
+):
     out, reference = Path(out), Path(reference)
+    runtime = {
+        "inference_transport": inference_transport,
+        "inference_cache_entries": inference_cache_entries,
+    }
     configure_torch(config.seed)
     if config.device == "cuda":
         if not torch.cuda.is_available():
@@ -123,11 +138,13 @@ def train(config, out, reference, *, resume=False, commit=None, stop_after_round
         saved = torch.load(out / "resume.pt", map_location="cpu", weights_only=False)
         if saved["config"] != asdict(config):
             raise ValueError("resume configuration must match exactly")
+        if saved.get("runtime", runtime) != runtime:
+            raise ValueError("resume inference runtime must match exactly")
         if saved["reference_sha256"] != hashlib.sha256(reference.read_bytes()).hexdigest():
             raise ValueError("resume reference changed")
         model = load_duo(out / "latest.pt").to(config.device)
         model.load_state_dict(saved["model_state"])
-        replay = deque(saved["replay"], maxlen=config.replay_positions)
+        replay = deque(replay_records(saved["replay"]), maxlen=config.replay_positions)
         rng = np.random.default_rng()
         rng.bit_generator.state = saved["numpy_rng"]
         start_round, best, games = saved["round"] + 1, saved["best"], saved["games"]
@@ -166,11 +183,14 @@ def train(config, out, reference, *, resume=False, commit=None, stop_after_round
         torch.set_rng_state(saved["torch_rng"])
         if config.device == "cuda":
             torch.cuda.set_rng_state_all(saved["cuda_rng"])
+        del saved  # The deque owns retained records; do not pin a stale full replay as it evolves.
     book = opening_book(config.validation_openings, seed=config.validation_seed)
     started = time.monotonic()
     last_round_seconds, last_round = 0.0, start_round - 1
     reason = "round_limit"
-    with SharedSearchPool(config) as pool:
+    with SharedSearchPool(
+        config, transport=inference_transport, cache_entries=inference_cache_entries
+    ) as pool:
         for round_ in range(start_round, config.rounds + 1):
             elapsed = previous_seconds + time.monotonic() - started
             if round_ > 1 and elapsed + last_round_seconds >= config.max_seconds:
@@ -225,7 +245,9 @@ def train(config, out, reference, *, resume=False, commit=None, stop_after_round
                     "elapsed_seconds": elapsed,
                     "model_state": model.state_dict(),
                     "optimizer": optimizer.state_dict(),
-                    "replay": list(replay),
+                    "replay": pack_replay(replay),
+                    "resume_format_version": 2,
+                    "runtime": runtime,
                     "numpy_rng": rng.bit_generator.state,
                     "torch_rng": torch.get_rng_state(),
                     "cuda_rng": torch.cuda.get_rng_state_all() if config.device == "cuda" else [],
@@ -296,12 +318,23 @@ def main():
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--reference", type=Path, required=True)
     parser.add_argument("--resume", action="store_true")
+    parser.add_argument(
+        "--inference-transport", choices=("queue", "shared_memory"), default="shared_memory"
+    )
+    parser.add_argument("--inference-cache-entries", type=int, default=0)
     defaults = asdict(DeepConfig())
     for name, value in defaults.items():
         parser.add_argument("--" + name.replace("_", "-"), type=type(value), default=value)
     args = parser.parse_args()
     config = DeepConfig(**{key: getattr(args, key) for key in defaults})
-    train(config, args.out, args.reference, resume=args.resume)
+    train(
+        config,
+        args.out,
+        args.reference,
+        resume=args.resume,
+        inference_transport=args.inference_transport,
+        inference_cache_entries=args.inference_cache_entries,
+    )
 
 
 if __name__ == "__main__":

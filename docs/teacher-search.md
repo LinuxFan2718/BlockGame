@@ -1,6 +1,13 @@
 # Controlled training with 1,024 versus 2,048 search simulations
 
-**Checkpoint recovery authorized; results pending.** Dennis confirmed the
+**Stopped at Dennis's explicit request on 27 October, 23:22 EDT.** The control
+retained 64 rounds / 16,384 additional games; teacher2048 retained 28 rounds /
+7,168 games. All committed checkpoints were downloaded, verified and backed
+up; the app has zero tasks and its follow-up is deleted. No held-out tests ran
+and no new model was promoted. Dennis requested implementation of the measured
+performance improvements before further training.
+
+The earlier checkpoint recovery was authorized: Dennis confirmed the
 cancellation was unintentional and explicitly requested resuming the saved
 checkpoint within the original $32 cap. The recovery continues control round 6
 without resetting its optimizer, RNG or replay, then runs the original teacher
@@ -329,3 +336,38 @@ The measurements and optimization recommendations are saved in
 separate local geometry-cache component benchmark. The running scientific
 study, resource limits, model and search settings were not changed. This
 performance investigation supplies no new evidence of playing strength.
+
+## Intentional stop and implementation handoff — 27 October, 23:22 EDT
+
+Human instruction: “please stop the running study and implement your speedups.”
+The exact running app was stopped with `modal app stop ... --yes`; this is an
+intentional stop, not a new provider failure or evidence about learning.
+No automatic resume or replacement training is authorized by the old schedule.
+The schedule `finish-resumed-blokus-training-study` was deleted.
+
+Saved state: `runs/duo-teacher-user-stopped-20261028T032155Z/` contains all 41
+private run files, provider logs, stopped-app/billing snapshots, a full download
+hash manifest and `stop-verified.json`. Control has 1,364 gradient steps;
+teacher has 594. Both retain 100,000 replay positions. Their atomic states
+match latest weights, cumulative progress and optimizer counters. The first
+five historical rows and original protocol/execution/failure records remain
+unchanged. Earlier certified and parent checkpoints were rechecked unchanged.
+
+Control resume SHA256:
+`facc6301b99ea948a3d85708b4a72e3da8bf0ac139c7601d51c90b9515f409c2`.
+Teacher resume SHA256:
+`45423ab8085724442288386e10fa8b5b38ee3c7479e1ced2ee5e2f146a5ef9f4`.
+Control selected additional round 64; teacher selected round 16, using validation
+only. These are untested candidates, not newly certified best agents.
+
+Provider snapshot for all three attempts totals $9.81204170: startup
+$0.00561232, cancelled original $0.55936204, stopped recovery $9.24706734.
+Reservations remain distinct from actual metering. The second local copy is
+`.backups/teacher-search-user-stopped-20261027.tar.gz`; all 55 archive members
+were read back and matched their recorded hashes. Original sources were copied
+before edits. The historical reporter now checks execution-commit source blobs
+instead of requiring today's intentionally upgraded source files to be old.
+
+The requested implementation and bounded performance measurements are separate
+from this unfinished scientific study. They do not establish improved playing
+strength, finish the reserved tests or authorize silently resuming training.

@@ -8,6 +8,7 @@ import torch
 
 from ._native import DuoSearch
 from .duo_env import decode_decision, legacy_decision
+from .duo_indices import policy_indices
 from .duo_learning import pack
 
 
@@ -22,6 +23,7 @@ class SearchResult:
     means: np.ndarray
     simulations: int
     nodes: int
+    indices: np.ndarray
 
     def action(self):
         # Visit counts decide, neural priors resolve equal counts deterministically.
@@ -76,10 +78,15 @@ def search_games(
                 else [(token, legacy_decision(game)) for token, game in tree.request(budget)]
             )
             for token, (observation, actions, candidates) in entries:
-                record = {"observation": observation, "candidates": candidates}
+                indices = policy_indices(actions, int(observation[630] == 0))
+                record = {
+                    "observation": observation,
+                    "candidates": candidates,
+                    "indices": indices,
+                }
                 pending.append((index, token, record, len(actions)))
                 if token == 0:
-                    roots[index] = (observation, actions, candidates)
+                    roots[index] = (observation, actions, candidates, indices)
         for offset in range(0, len(pending), inference_batch):
             subset = pending[offset : offset + inference_batch]
             probabilities, values = evaluator([entry[2] for entry in subset])
@@ -94,7 +101,7 @@ def search_games(
     results = []
     for index, tree in enumerate(trees):
         stats = tree.stats()
-        observation, actions, candidates = roots[index]
+        observation, actions, candidates, indices = roots[index]
         if not np.array_equal(actions, stats["actions"]):
             raise RuntimeError("search/network legal action ordering mismatch")
         visits = np.asarray(stats["visits"], dtype=np.int64)
@@ -111,6 +118,7 @@ def search_games(
                 np.asarray(stats["means"]),
                 simulations,
                 stats["nodes"],
+                indices,
             )
         )
     if metrics is not None:

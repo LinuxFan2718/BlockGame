@@ -177,7 +177,13 @@ def audit_history(run):
                 "executed source archive/commit changed",
             )
         for module, expected in execution["training_module_sha256"].items():
-            require(digest(f"python/blokus_rl/{module}.py") == expected, "training module changed")
+            committed = subprocess.check_output(
+                ["git", "show", execution["source_commit"] + f":python/blokus_rl/{module}.py"]
+            )
+            require(
+                hashlib.sha256(committed).hexdigest() == expected,
+                "historical training source changed",
+            )
     recovery = read(run / "recovery-execution.json")
     require(
         recovery["recovery"] is True

@@ -9,6 +9,7 @@ from blokus_rl.duo_continuation import initialize_branch
 from blokus_rl.duo_deep import train
 from blokus_rl.duo_learning import load_duo, save_duo
 from blokus_rl.duo_model import DuoActorCritic
+from blokus_rl.duo_replay import replay_records
 from blokus_rl.learning import configure_torch
 from test_duo_deep import small_config
 
@@ -29,10 +30,11 @@ def test_fork_preserves_state_rejects_changed_parent_and_resumes(tmp_path):
     b = torch.load(source, weights_only=False)
     assert a["round"] == a["games"] == 0 and a["best"] == 0.5
     assert all(torch.equal(value, b["model_state"][key]) for key, value in a["model_state"].items())
-    assert len(a["replay"]) == len(b["replay"])
+    a_replay, b_replay = replay_records(a["replay"]), replay_records(b["replay"])
+    assert len(a_replay) == len(b_replay)
     assert all(
         np.array_equal(x["observation"], y["observation"])
-        for x, y in zip(a["replay"], b["replay"], strict=True)
+        for x, y in zip(a_replay, b_replay, strict=True)
     )
     for key, value in a["optimizer"]["state"].items():
         for name, tensor in value.items():
@@ -84,14 +86,18 @@ def test_selected_best_resets_optimizer_keeps_replay_and_recovers(tmp_path):
         initialize_selected(child_config, out, selected, source, selected_best=True)
         state = torch.load(out / "resume.pt", weights_only=False)
         assert not state["optimizer"]["state"]
-        assert len(state["replay"]) == len(saved["replay"])
+        state_replay, saved_replay = (
+            replay_records(state["replay"]),
+            replay_records(saved["replay"]),
+        )
+        assert len(state_replay) == len(saved_replay)
         assert all(
             torch.equal(v, state["model_state"][k])
             for k, v in saved["best_checkpoint"]["model_state"].items()
         )
         assert all(
             np.array_equal(a["visits"], b["visits"])
-            for a, b in zip(state["replay"], saved["replay"], strict=True)
+            for a, b in zip(state_replay, saved_replay, strict=True)
         )
     train(child_config, left, selected, resume=True)
     train(child_config, right, selected, resume=True, stop_after_round=1)
