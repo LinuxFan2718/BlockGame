@@ -85,6 +85,10 @@ def main():
             > 0
         )
         assert metrics["graph_fallback_positions"] == 0
+        fast = metrics["simulations"] - row["recorded_roots"] * row["full_simulations"]
+        assert fast >= 0 and fast % 32 == 0
+        assert metrics["neural_positions"] <= metrics["simulations"]
+        assert metrics["graph_padded_positions"] >= metrics["graph_requested_positions"]
         assert 0 < metrics["collect_seconds"] < 150
         assert row["recorded_roots"] > 0
         c = row["config"]

@@ -143,3 +143,12 @@ settlement keeps$1 reserved for all stopped startup attempts and releases only
 their unused reservation. With the corrected validation and full8h run, net
 reservations will be$22.27935 under the original$23 cap. Actual charges for every
 attempt are reported separately and are never erased by settlement.
+
+At08:33 EDT the corrected app`ap-oOQqAsXkZ1Zg1czJgwIxza` was running the intended
+validation. The child SDK/Volume probe, Linux native comparison, numerical checks
+before/after optimizer updates, and exact single-worker GPU recovery all passed.
+Repeated frozen-model throughput comparisons then started. No main training had
+started at that point. The two unpromoted smoke branches each took two gradient
+steps (four total), separately from the two discarded numerical optimizer probes.
+The12 throughput cases add3,072 measured and144 warm-up games, all frozen-model
+performance work rather than learned training experience.
