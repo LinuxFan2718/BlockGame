@@ -78,6 +78,12 @@ class GraphBucket:
         with torch.cuda.graph(self.graph), torch.no_grad():
             self.probabilities, self.values = self.forward()
         torch.cuda.synchronize()
+        # Reuse NumPy views of these persistent pinned buffers. Returned results
+        # still own their storage; these views never escape the evaluator.
+        self.output_arrays = (self.host_probabilities.numpy(), self.host_values.numpy())
+        self.output_views = {
+            batch: (self.host_probabilities, self.probabilities, self.host_values, self.values)
+        }
         self.setup_seconds = time.monotonic() - started
 
     def forward(self):
@@ -114,11 +120,24 @@ class GraphBucket:
     @torch.no_grad()
     def finish(self, n, width):
         self.graph.replay()
-        self.host_probabilities.copy_(self.probabilities, non_blocking=True)
-        self.host_values.copy_(self.values, non_blocking=True)
+        # Prefix rows stay contiguous on both devices. Trim only when at least
+        # 64 KiB is avoided; small copies do not repay extra view handling.
+        key = n if (self.batch - n) * (self.width + 1) * 4 >= 65536 else self.batch
+        views = self.output_views.get(key)
+        if views is None:
+            views = (
+                self.host_probabilities[:key],
+                self.probabilities[:key],
+                self.host_values[:key],
+                self.values[:key],
+            )
+            self.output_views[key] = views
+        host_p, device_p, host_v, device_v = views
+        host_p.copy_(device_p, non_blocking=True)
+        host_v.copy_(device_v, non_blocking=True)
         torch.cuda.current_stream().synchronize()
-        p = self.host_probabilities[:n, :width].numpy().copy()
-        v = self.host_values[:n].numpy().copy()
+        p = self.output_arrays[0][:n, :width].copy()
+        v = self.output_arrays[1][:n].copy()
         if not np.isfinite(p).all() or not np.isfinite(v).all():
             raise RuntimeError("nonfinite graphed inference")
         return p, v

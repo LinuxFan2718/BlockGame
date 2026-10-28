@@ -25,11 +25,17 @@ def main():
         ROOT / "docs/control-replication-protocol.json",
         ROOT / "runs/integrated-validation-verified.json",
         ROOT / "python/blokus_rl/duo_control_replication_report.py",
+        ROOT / "docs/control-replication-performance.md",
+        ROOT / "python/blokus_rl/duo_cuda_graphs.py",
+        ROOT / "python/tests/test_duo_graph_outputs.py",
+        ROOT / "cloud/profile_result_copies.py",
+        ROOT / "cloud/report_live_performance.py",
     }
     paths.update((ROOT / "cloud").glob("*control_replication*.py"))
     paths.update(p for p in (ROOT / "runs").glob("*replication*") if p.is_file())
     for prefix in (
         ROOT / "runs/integrated-payload-1070",
+        *[p for p in (ROOT / "runs").glob("control-replication-profile-*") if p.is_dir()],
         *args.run,
     ):
         if prefix.exists():

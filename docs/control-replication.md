@@ -127,3 +127,10 @@ results. Snapshot: `runs/control-replication-startup-snapshot-20261028T155635Z/`
 Initial source/receipt backup `.backups/control-replication-startup-20261028.tar.gz`
 read back all 41 members successfully (SHA256
 `e24466e8b1620d8848eb2919860dcc0656f2b851e8bff22c0214e45372193874`).
+
+The [live performance report](control-replication-performance.md) covers the
+completed training phase and the small local result-copy improvement. Training
+finished all 16,384 games at **12:24:40 EDT** and held-out evaluation started.
+The active study retains its original pinned runtime; the copy patch is staged
+for subsequent deployment. The shared completion follow-up also monitors
+performance/phase changes and will include profiling overhead in the closeout.

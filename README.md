@@ -79,6 +79,8 @@ The authorized [fresh-seed control replication](docs/control-replication.md)
 was submitted at 11:53 EDT, using the original parent, the cheaper 1,024-search
 training recipe and a fresh held-out book. Its result is pending; the $11 phase
 ceiling preserves the existing $50 credit reserve.
+The [live profile and copy optimization](docs/control-replication-performance.md)
+show remaining host/inference overhead; the active replication keeps its pinned runtime.
 See the [protocol](docs/continuation-status.md) for settings, costs and limitations.
 To play the earlier preserved parent at the fast 128-simulation budget:
 `.venv/bin/blokus-rl duo-play runs/duo-continuation-final-20261026T2007/duo-continuation-865/frozen-strong1024.pt --simulations 128`.
