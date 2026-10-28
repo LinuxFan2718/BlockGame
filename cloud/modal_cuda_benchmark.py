@@ -12,7 +12,7 @@ from pathlib import Path
 import modal
 
 ROOT = Path(__file__).resolve().parent.parent
-RUN = "duo-cuda-graphs-1069"
+RUN = "duo-cuda-graphs-1069-r1"
 PROFILE = "linuxfan2718"
 VOLUME = "blokus-deep-selfplay-20261026"
 BASE_IMAGE = "im-BnyLYweX6vlwu6iCpDnqrC"
@@ -20,7 +20,7 @@ MODEL = "/data/duo-continuation-865/frozen-strong1024.pt"
 MODEL_SHA = "95569be7c179180c12681255dbcee9884f465e713f418e958a508907beb4d512"
 RESUME = "/data/duo-continuation-865/strong1024/resume.pt"
 RESUME_SHA = "df74afa8bf699eb63f9dcf4d32cd13530e7b276f66c63ddd28368049edf75911"
-PAYLOAD = ROOT / "runs/duo-cuda-payload"
+PAYLOAD = ROOT / "runs/duo-cuda-payload-r1"
 TIMEOUT = 1800
 CAP = 5.0
 RESERVATION = 4.19642
@@ -249,7 +249,7 @@ def h100(execution):
 def main(gpu: str = "l40s"):
     if gpu not in ("l40s", "h100"):
         raise ValueError("only planned GPUs")
-    ledger = ROOT / f"runs/modal-cuda-graphs-{gpu}-cost-ledger.jsonl"
+    ledger = ROOT / f"runs/modal-cuda-graphs-{gpu}-r1-cost-ledger.jsonl"
     if ledger.exists():
         raise ValueError("stage already submitted; no duplicate")
     if gpu == "h100" and not (ROOT / "runs/cuda-graphs-l40s-verified.json").exists():
@@ -260,6 +260,16 @@ def main(gpu: str = "l40s"):
     )
     if any(int(a["tasks"]) for a in apps):
         raise ValueError("existing active compute")
+    stopped_attempt = json.loads(
+        (ROOT / "runs/duo-cuda-l40s-interrupted-20261028T043915Z/apps-stopped.json").read_text()
+    )
+    if not any(
+        a["app_id"] == "ap-yGUCk4BBAXkUA1RrJmyJze"
+        and a["state"] == "stopped"
+        and int(a["tasks"]) == 0
+        for a in stopped_attempt
+    ):
+        raise ValueError("preserve stopped original attempt first")
     billing = json.loads(
         subprocess.check_output(
             base + ["billing", "summary", "--json", "--profile", PROFILE], text=True
@@ -301,6 +311,9 @@ def main(gpu: str = "l40s"):
             str(p.relative_to(PAYLOAD)): sha(p) for p in sorted(PAYLOAD.rglob("*")) if p.is_file()
         },
         "combined_reserved_usd": RESERVATION,
+        "previous_attempt_app_id": "ap-yGUCk4BBAXkUA1RrJmyJze",
+        "previous_attempt_metered_usd": "0.19414255",
+        "reservation_detail": "3.69642 for both remaining GPU hard limits, .25 for stopped attempt, .25 build allowance; shared reservation, not additive per ledger",
         "combined_cap_usd": CAP,
         "timeout_seconds_per_gpu": TIMEOUT,
         "hourly_usd": float(rates["gpu_hour_cost_" + gpu])

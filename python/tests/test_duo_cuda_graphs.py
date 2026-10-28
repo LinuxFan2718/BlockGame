@@ -6,6 +6,30 @@ from blokus_rl.duo_cuda_graphs import BATCH_BUCKETS, bucket, fill_staging
 from blokus_rl.duo_env import PASS, STATE_SIZE
 
 
+def test_benchmark_fixture_materializes_archive_members_once(tmp_path):
+    import importlib.util
+    from pathlib import Path
+
+    path = Path(__file__).resolve().parents[2] / "cloud/duo_cuda_benchmark.py"
+    spec = importlib.util.spec_from_file_location("fixture_probe", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    archive = tmp_path / "inputs.npz"
+    observations = np.arange(3 * STATE_SIZE, dtype=np.float32).reshape(3, STATE_SIZE)
+    np.savez_compressed(
+        archive,
+        observations=observations,
+        indices=np.asarray([1, 2, 5, 7, 9]),
+        offsets=np.asarray([0, 2, 3, 5]),
+    )
+    rows = module.fixture(archive)
+    assert len(rows) == 3
+    assert rows[0]["observation"].base is rows[1]["observation"].base
+    assert rows[0]["indices"].base is rows[1]["indices"].base
+    assert np.array_equal(rows[2]["observation"], observations[2])
+    assert rows[1]["indices"].tolist() == [5]
+
+
 def test_buckets_bound_padding_and_refuse_unsupported_shapes():
     assert bucket(1, BATCH_BUCKETS) == 8
     assert bucket(65, BATCH_BUCKETS) == 128

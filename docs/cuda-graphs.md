@@ -93,3 +93,23 @@ then report results. No follow-on training is part of this authorization.
 References: [PyTorch CUDA Graph semantics](https://docs.pytorch.org/docs/2.14/notes/cuda.html),
 [PyTorch pinned transfer guidance](https://docs.pytorch.org/tutorials/intermediate/pinmem_nonblock.html),
 [Modal GPU selection](https://modal.com/docs/guide/gpu).
+
+## Corrected loader attempt
+
+The first L40S app `ap-yGUCk4BBAXkUA1RrJmyJze` passed the native and graph
+numerical checks and completed the inference microbenchmarks, then its first
+collection subprocess hit the 160-second limit. Diagnosis found a benchmark
+loader error: indexing lazy `NpzFile` members once per row repeatedly decompressed
+whole arrays and retained duplicate backing arrays. The fix materializes each
+array once and returns shared views; a regression test checks their shared
+backing storage. Scientific settings, graph code, native code and weights stay
+the same. The original protocol/source/payload/ledger are retained unchanged.
+
+The original app is stopped with zero tasks, metered **$0.19414255**. Its complete
+microbenchmarks, failure and telemetry are preserved in
+`runs/duo-cuda-l40s-interrupted-20261028T043915Z/`. This is included in the same
+$4.19642 reservation/$5 cap: $3.69642 for the two remaining GPU hard limits,
+$0.25 allowance for the stopped attempt and $0.25 for image build/startup.
+The corrected run is `duo-cuda-graphs-1069-r1`, with separate `-r1` ledgers and
+payload archive. It repeats the comparisons with the corrected loader; initial
+microbenchmarks remain diagnostic evidence, not mixed into its repetitions.

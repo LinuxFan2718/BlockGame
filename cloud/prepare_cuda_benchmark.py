@@ -9,7 +9,7 @@ from pathlib import Path
 from benchmark_duo_native import corner_source, priority_source
 
 ROOT = Path(__file__).resolve().parent.parent
-payload = ROOT / "runs/duo-cuda-payload"
+payload = ROOT / "runs/duo-cuda-payload-r1"
 payload.mkdir(exist_ok=False)
 overlay = payload / "optimized/blokus_rl"
 overlay.mkdir(parents=True)
@@ -41,10 +41,10 @@ manifest = {
     for p in sorted(payload.rglob("*"))
     if p.is_file()
 }
-with tarfile.open(ROOT / "runs/duo-cuda-payload.tar.gz", "w:gz") as tar:
+with tarfile.open(ROOT / "runs/duo-cuda-payload-r1.tar.gz", "w:gz") as tar:
     for name in manifest:
         tar.add(payload / name, arcname=name)
-(ROOT / "runs/duo-cuda-payload-sha256.json").write_text(json.dumps(manifest, indent=2) + "\n")
+(ROOT / "runs/duo-cuda-payload-r1-sha256.json").write_text(json.dumps(manifest, indent=2) + "\n")
 print(
     json.dumps(
         {"files": len(manifest), "bytes": sum((payload / n).stat().st_size for n in manifest)}

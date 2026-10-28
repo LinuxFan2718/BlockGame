@@ -24,13 +24,18 @@ def phase(path, name, event):
 
 
 def fixture(path):
-    data = np.load(path)
+    # NpzFile is lazy: indexing a member decompresses it again on each access.
+    # Materialize each array once; every record is a small view of those arrays.
+    with np.load(path) as data:
+        observations = data["observations"]
+        indices = data["indices"]
+        offsets = data["offsets"]
     return [
         {
-            "observation": data["observations"][i],
-            "indices": data["indices"][data["offsets"][i] : data["offsets"][i + 1]],
+            "observation": observations[i],
+            "indices": indices[offsets[i] : offsets[i + 1]],
         }
-        for i in range(len(data["observations"]))
+        for i in range(len(observations))
     ]
 
 
