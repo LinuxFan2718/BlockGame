@@ -40,6 +40,6 @@ It ultimately chooses using those visit counts. The checked playing configuratio
 
 Its efficiency choices are particularly relevant to us: the checked configuration runs **1,024 concurrent games**, feeding GPU batches of **128 positions**. It uses cheaper200-simulation searches for80% of moves and1,000-simulation searches for the remainder. Only the full searches are recorded as training examples. [Self-play configuration](https://github.com/ShivamSarodia/AlphaBlokus/blob/b4470ef9667e7c6f000a0542bb3aaa4d5cce1292/configs/self_play/full_mcts_vast.toml).
 
-This strengthens the case for giving a deeper CNN and efficiently batched self-play a serious trial in our project. **Its described training starts without Pentobi demonstrations**; Pentobi supplies a benchmark. I verified the architecture, but haven’t independently reproduced its playing strength or reported training cost.
+We subsequently tested a similar ten-block residual network: it lost to our small CNN at the supplied budget. That result and the newer training/transfer evidence are covered in the [architecture comparison](architecture-comparison.md). **AlphaBlokus's described training starts without Pentobi demonstrations**; Pentobi supplies a benchmark. I verified the architecture, but haven’t independently reproduced its playing strength or reported training cost.
 
 The fuller explanation and source references are in [our AlphaBlokus study](alphablokus-study.md).
