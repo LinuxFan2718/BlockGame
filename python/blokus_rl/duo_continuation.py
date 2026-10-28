@@ -15,6 +15,7 @@ import torch
 from .duo_deep import atomic_json
 from .duo_learning import load_duo
 from .duo_replay import replay_length
+from .duo_training_device import metal_rng_state, prepare_training_device
 from .learning import configure_torch
 
 
@@ -35,6 +36,7 @@ def initialize_branch(config, out, reference, source_resume, *, selected_best=Fa
     out, reference, source_resume = map(Path, (out, reference, source_resume))
     if out.exists():
         raise ValueError("branch directory already exists; use exact-config resume")
+    prepare_training_device(config.device, config.precision)
     saved = torch.load(source_resume, map_location="cpu", weights_only=False)
     parent = load_duo(reference)
     parent_config = saved["config"]
@@ -76,6 +78,7 @@ def initialize_branch(config, out, reference, source_resume, *, selected_best=Fa
         numpy_rng=np.random.default_rng(config.seed).bit_generator.state,
         torch_rng=torch.get_rng_state(),
         cuda_rng=torch.cuda.get_rng_state_all() if config.device == "cuda" else [],
+        mps_rng=metal_rng_state(config.device),
         best_checkpoint=torch.load(reference, map_location="cpu", weights_only=True),
     )
     # All checks precede creation, so rejected forks leave no misleading run.

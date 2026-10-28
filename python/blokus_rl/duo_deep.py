@@ -20,6 +20,12 @@ from .duo_learning import load_duo, save_duo
 from .duo_replay import pack_replay, replay_records
 from .duo_residual import DuoResidualActorCritic
 from .duo_shared import SharedSearchPool, pack_indexed, precision_context
+from .duo_training_device import (
+    metal_rng_state,
+    prepare_training_device,
+    restore_metal_rng,
+    validate_training_precision,
+)
 from .learning import configure_torch
 
 
@@ -67,8 +73,7 @@ class DeepConfig:
             raise ValueError("visit counts must fit unsigned16 replay storage")
         if self.architecture not in ("residual", "conv"):
             raise ValueError("expected residual or conv architecture")
-        if self.device not in ("cpu", "cuda") or self.precision not in ("float32", "bfloat16"):
-            raise ValueError("unsupported device/precision")
+        validate_training_precision(self.device, self.precision)
         if self.channels % 8 or self.channels < 8:
             raise ValueError("channels must be divisible by eight")
 
@@ -139,11 +144,10 @@ def train(
         "compact_native": compact_native,
         "ready_batching": ready_batching,
     }
+    if config.device == "mps":
+        runtime["deterministic_algorithms"] = "warn_only: MPS scatter backward"
     configure_torch(config.seed)
-    if config.device == "cuda":
-        if not torch.cuda.is_available():
-            raise RuntimeError("CUDA requested but unavailable")
-        torch.set_float32_matmul_precision("high")
+    prepare_training_device(config.device, config.precision, inference_backend, evaluation_backend)
     if resume:
         saved = torch.load(out / "resume.pt", map_location="cpu", weights_only=False)
         if saved["config"] != asdict(config):
@@ -152,6 +156,8 @@ def train(
             raise ValueError("resume inference runtime must match exactly")
         if saved["reference_sha256"] != hashlib.sha256(reference.read_bytes()).hexdigest():
             raise ValueError("resume reference changed")
+        # Reject missing Metal state before touching the atomic model/best files.
+        restore_metal_rng(config.device, saved)
         model = load_duo(out / "latest.pt").to(config.device)
         model.load_state_dict(saved["model_state"])
         replay = deque(replay_records(saved["replay"]), maxlen=config.replay_positions)
@@ -193,6 +199,7 @@ def train(
         torch.set_rng_state(saved["torch_rng"])
         if config.device == "cuda":
             torch.cuda.set_rng_state_all(saved["cuda_rng"])
+        restore_metal_rng(config.device, saved)
         del saved  # The deque owns retained records; do not pin a stale full replay as it evolves.
     book = opening_book(config.validation_openings, seed=config.validation_seed)
     started = time.monotonic()
@@ -268,6 +275,7 @@ def train(
                     "numpy_rng": rng.bit_generator.state,
                     "torch_rng": torch.get_rng_state(),
                     "cuda_rng": torch.cuda.get_rng_state_all() if config.device == "cuda" else [],
+                    "mps_rng": metal_rng_state(config.device),
                     "best_checkpoint": torch.load(
                         out / "best.pt", map_location="cpu", weights_only=True
                     ),
