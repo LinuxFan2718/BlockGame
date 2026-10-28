@@ -1,15 +1,31 @@
 # Integrated speedups and fresh controlled run — 28 October 2026
 
-**Morning status at 08:51 EDT:** the speedups are implemented and verified. The
-fresh full study started at **08:47 EDT** and has completed its first three saved
-control rounds (768 games). The requested overnight training did **not** start
-overnight. Held-out strength results are still pending. All client times here are
-EDT on 28 October 2026; provider billing uses UTC.
+**Completed at 11:18 EDT on 28 October 2026 and independently verified locally.**
+Both branches finished all 64 rounds (16,384 new games each), followed by all
+1,200 external and 800 head-to-head games. All compute is stopped. The requested
+overnight run actually started at 08:47 EDT that morning; it did not run overnight.
 
-The integrated pipeline uses Rust move/search improvements, compact indices,
-bulk shared-memory inference, ready batching and CUDA Graphs. Bulk staging adds
-**18.7% / 27.1% throughput** at full-search 1,024 / 2,048 over the already
-Rust-optimized, graphed legacy-row path. The local and GPU checks below passed.
+The teacher improved its draw-half score against Pentobi 4 from the parent’s
+**30.25% to 43.75%**: **+13.5 percentage points**, nominal paired 95% interval
+**+5.5 to +21.5**. This meets the prespecified primary improvement criterion on
+this book. The control scored **44.0%**, with no demonstrated teacher advantage:
+teacher-minus-control **−0.25 points**, interval **−7.25 to +6.75**. Neither
+selected branch establishes a majority score against level 4; both absolute
+intervals cross 50%. The stretch goal was not met.
+
+The speedups are implemented and verified. Bulk staging adds **18.7% / 27.1%**
+throughput at full-search 1,024 / 2,048 over the already optimized Rust/CUDA Graph
+path. This performance result is separate from the learning comparison.
+
+**Recommendation:** replicate with an independent training seed and fresh test
+book before scaling. The cheaper 1,024-search training branch is the economical
+baseline: it matched level-4 strength here while using less search compute. Keep
+both models; this run does not establish equivalence or rule out a teacher benefit.
+No further paid run or level advancement was launched.
+
+All six app attempts together metered **$6.83204552**, versus **$22.27935333**
+reserved under the **$23 cap**. Shared storage/egress are not allocated per app in
+that sum; the final account snapshot is reported below. The $50 reserve is retained.
 
 ## What changed
 
@@ -150,7 +166,7 @@ not change during wrapper repairs. The ledger retains all original reservations
 plus a negative settlement releasing only unused startup reservation and keeping
 $1 for **all** failed attempts. Startup metering snapshot was $0.01691356.
 Corrected validation reserves $1.05314333; study reserves $20.22621. Net combined
-reservation will be $22.27935333, under $23. **Reservation is not actual spend.**
+reservation was $22.27935333, under $23. **Reservation is not actual spend.**
 All actual failed and successful app costs remain in the final cost report.
 
 Ledger: `runs/modal-integrated-cost-ledger.jsonl`. Exclusive remote directories
@@ -224,3 +240,157 @@ profile and low broad-sample GPU activity, this points to feeding and coordinati
 search work as the remaining constraint. It does not prove that a particular CPU
 function dominates, and an idle GPU does not require every CPU core to be busy.
 Larger GPU capacity alone has not improved this workload economically.
+
+## Verified full-study results
+
+Primary verdict: **improvement**. All 1,200 external action traces were independently replayed. All 800 head-to-head outcomes and counters were audited; those games have no saved action traces.
+
+![Held-out results](assets/integrated-training-results.png)
+
+| Case | W–D–L | Win rate | Score (draw half) | Nominal 95% score interval | Mean margin | Game seconds | Actual actor simulations | Neural positions |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| Preserved parent vs level 3 | 114–10–76 | 57.00% | 59.50% | 53.00%–66.00% | 1.05 | 337.9 | 6,432,768 | 4,526,561 |
+| Preserved parent vs level 4 | 55–11–134 | 27.50% | 30.25% | 25.00%–35.50% | -4.24 | 366.8 | 6,373,376 | 4,505,413 |
+| Control 1,024 vs level 3 | 126–12–62 | 63.00% | 66.00% | 60.50%–71.25% | 2.35 | 359.2 | 6,379,520 | 4,485,304 |
+| Control 1,024 vs level 4 | 84–8–108 | 42.00% | 44.00% | 38.00%–50.25% | -2.22 | 364.8 | 6,369,280 | 4,469,137 |
+| Teacher 2,048 vs level 3 | 125–5–70 | 62.50% | 63.75% | 57.74%–69.75% | 2.22 | 356.5 | 6,365,184 | 4,504,253 |
+| Teacher 2,048 vs level 4 | 81–13–106 | 40.50% | 43.75% | 37.50%–50.50% | -0.98 | 345.5 | 6,397,952 | 4,552,796 |
+
+All cases use 2,048 simulations per searched actor decision. Game seconds include both agents and game work, not pure neural or GPU latency.
+
+| Paired comparison | Score difference | Nominal 95% whole-opening interval |
+|---|---:|---:|
+| teacher2048-minus-parent-pentobi3 | +4.25pp | -4.25 to +12.50pp |
+| teacher2048-minus-control1024-pentobi3 | -2.25pp | -10.75 to +6.25pp |
+| control1024-minus-parent-pentobi3 | +6.50pp | -1.75 to +14.75pp |
+| teacher2048-minus-parent-pentobi4 | +13.50pp | +5.50 to +21.50pp |
+| teacher2048-minus-control1024-pentobi4 | -0.25pp | -7.25 to +6.75pp |
+| control1024-minus-parent-pentobi4 | +13.75pp | +5.50 to +22.25pp |
+
+| Branch | Completed rounds / new games | Recorded roots | Gradients | Actual simulations | Collection seconds | Training seconds | Total branch seconds / soft cap | Selected additional round / games |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| Control 1,024 | 64 / 16,384 | 114,275 | 1,371 | 131,617,952 | 1405.4 | 11.4 | 2411.0 / 6000 | 48 / 12,288 |
+| Teacher 2,048 | 64 / 16,384 | 113,482 | 1,364 | 246,995,680 | 2571.1 | 10.9 | 3550.3 / 10000 | 64 / 16,384 |
+
+| Head-to-head | W–D–L | Score | Nominal 95% whole-opening interval | Mean margin | Seconds |
+|---|---:|---:|---:|---:|---:|
+| teacher-vs-control-search2048 | 99–16–85 | 53.50% | 47.50%–59.50% | 1.19 | 433.8 |
+| teacher-vs-control-raw | 94–17–89 | 51.25% | 45.50%–57.00% | -0.33 | 1.3 |
+| teacher-vs-parent-raw | 124–10–66 | 64.50% | 58.25%–70.50% | 3.49 | 1.2 |
+| control-vs-parent-raw | 97–8–95 | 50.50% | 44.25%–57.00% | 1.48 | 1.1 |
+
+Raw and searched results above remain separate. Validation chose checkpoints; the held-out results did not. The full verification JSON retains validation rows, runtime/source hashes, optimizer/replay checks, exact actor decisions and all paired scores.
+
+| Provider app | Actual metering USD |
+|---|---:|
+| ap-6udDwXXAr6DC6c49IVqVv7 | $6.35700884 |
+| ap-CioAB9zwQl4m3qfaDzvsrf | $0.01470139 |
+| ap-KwsyrmMhvZpLz8Xy9P9LSy | $0.00088552 |
+| ap-TSgLReotCBET6Pvijbc13n | $0.00040576 |
+| ap-oOQqAsXkZ1Zg1czJgwIxza | $0.45812312 |
+| ap-tUfMbBe5gfBIYvlmZ3wD25 | $0.00092089 |
+
+Combined net reservation: $22.27935333 under $23; reservation is not actual spend. Whole study helper runtime: 9041.2s. Billing and app lifetime are separate.
+
+A promising primary outcome warrants an independently seeded replication with a prespecified budget; an inconclusive or negative result warrants diagnosis before further training. No next paid run was launched automatically.
+
+
+## Interpretation, experience and resource limits
+
+Both searched policies improved against the retested parent on the same level-4
+book: control **+13.75 points [5.5, 22.25]**, teacher **+13.5 [5.5, 21.5]**. Extra
+training helped under this protocol; the additional teacher search has not shown
+a further gain. Teacher–control head-to-head scores were **53.5% with search**
+[47.5%, 59.5%] and **51.25% raw** [45.5%, 57.0%], both inconclusive. The teacher’s
+raw policy beat the parent with **64.5% score** [58.25%, 70.5%]; the control–parent
+raw score was **50.5%** [44.25%, 57.0%]. These opponent-specific comparisons do
+not establish a transitive ranking or a causal advantage from extra search.
+
+Validation selected control additional round **48 / 12,288 games** and teacher
+round **64 / 16,384 games**, before the held-out book. Their weight-lineage
+count plus new selected games was **73,728 / 77,824**, respectively; this excludes
+separate exposure to the later inherited replay and is not a count of independent
+or unique data. Both complete
+training branches nevertheless ran the planned **16,384 new games**; neither soft
+cap bound and neither overshot it. Selected experience differs, and the teacher
+used **87.7% more actual training simulations** and **47.3% more branch wall time**.
+The nominal intervals describe opening-book uncertainty, not training-seed
+replication. The inherited replay came from later parent round 128 even though
+initial selected weights came from round 112. Keep these limits when interpreting
+one parent lineage and one training seed.
+
+The raw results and searched results remain separate; validation scores selected
+checkpoints and are not held-out success measures. No human Elo, four-player
+Classic/frontier or AlphaBlokus performance is inferred. The test book is fresh
+relative to previous reports, so old scores are not matched-book baselines.
+
+Whole-main-function telemetry contains **1,798 samples**: GPU busy mean **15.3%**,
+median **18%**, p95 **31%**, sampled maximum **53%**; mean CPU **2.46 of 8 cores**;
+peak host memory **15.10 of 24 GiB**; peak VRAM **2,704 of 46,068 MiB**. Hardware
+was NVIDIA L40S, driver 610.57.04, PyTorch 2.14.1+cu130 / CUDA 13.0. This mixed
+sample includes serial external opponents, validation, fitting, checkpointing and
+raw games; it is not a phase-isolated profile or a FLOP-utilization measurement.
+Neither GPU capacity nor memory capacity was saturated across that mixed workload.
+Host coordination, available search work and persistence remain useful targets
+before spending on a larger GPU.
+
+Across both branches, fitting took only **22.25 seconds**, collection **3,976.47
+seconds**, and branch wall time **5,961.25 seconds**. The remaining time includes
+validation, capture preparation, checkpoint serialization, Volume commits and other
+overhead. Instrument these separately before attributing all remaining time to a
+specific CPU function or changing checkpoint durability. The recorded round timers
+exclude the following Volume commit, while full branch wall time includes it.
+
+The helper finished at **11:18:35 EDT**, after **9,041.16 seconds**; the wrapper
+finished at **11:18:40 EDT**, after **9,061.39 seconds**, below its eight-hour hard
+limit. Total actor decisions in the 1,200 external games were **18,710**, each with
+exactly **2,048 simulations**, totaling **38,318,080 simulations**. Training used
+**570,536** searched decisions for control (114,275 full / 456,261 fast) and
+**569,249** for teacher (113,482 full / 455,767 fast). Mean actual inference batches
+were **84.67 / 82.80**. The full verification JSON retains per-case actor decisions,
+all neural-position counts and all training/validation counters.
+
+Final auditor command (launches no games):
+
+```sh
+MPLCONFIGDIR=.cache/matplotlib .venv/bin/python -m blokus_rl.duo_integrated_report \
+  --run runs/integrated-study-final-20261028T152508Z/duo-integrated-teacher-1070 \
+  --apps runs/integrated-study-final-20261028T152508Z/stopped-apps.json \
+  --app-id ap-6udDwXXAr6DC6c49IVqVv7 \
+  --billing runs/integrated-study-final-20261028T152508Z/billing-report.json
+```
+
+The completed download and verification are under
+`runs/integrated-study-final-20261028T152508Z/`. Frozen control SHA256:
+`35b9dd6a49b65f5d3d43f9c8500702385c5131e6f3023892a441fe3a1405c3a4`;
+frozen teacher SHA256:
+`51f9acc7b52402b1f39610e3db7f17e19ed0e1887c8a906812c8d6de3d78f1e8`.
+The parent, original round-128 state, certified models and both intentionally
+stopped earlier resume states were verified unchanged. All main, validation and
+failed startup costs remain recorded. The main study had no interruption or retry.
+
+## Closeout and reproducible artifacts
+
+The final provider account snapshot metered **$53.03137374 across all account
+work**, below the $80 spending allowance that preserves $50 of the original $130.
+The study-specific sum is **$6.83204552 across all six app attempts**, including
+failed startups and the validation. It is not calculated by subtracting two
+possibly unsettled account snapshots. Shared Volume/egress metering is not
+assigned to individual app rows. Final billing snapshots and stopped-app evidence
+are saved alongside the audited download; all returned apps were stopped with
+zero tasks. Prior startup/validation stopped states remain in their saved audits.
+No funds were added, no plan changed and no protected reserve released.
+
+Results generation:
+
+```sh
+MPLCONFIGDIR=.cache/matplotlib .venv/bin/python cloud/write_integrated_results.py \
+  --verification runs/integrated-study-final-20261028T152508Z/verification.json
+```
+
+Both figures were visually inspected. The final backup is
+`.backups/integrated-study-complete-20261028.tar.gz`, with a SHA256 sidecar and a
+full archive-member SHA256 manifest. Every member is read back and compared to
+its original hash by the backup script. Local code and documentation are
+committed without pushing. The shared completion follow-up is removed after
+closeout; there is no automatic next experiment.

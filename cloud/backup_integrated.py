@@ -20,6 +20,7 @@ def main():
     destination = ROOT / ".backups" / (args.name + ".tar.gz")
     destination.parent.mkdir(exist_ok=True)
     paths = {
+        ROOT / "README.md",
         ROOT / "docs/integrated-overnight.md",
         ROOT / "python/blokus_rl/duo_integrated_report.py",
     }

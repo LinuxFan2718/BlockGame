@@ -65,11 +65,18 @@ main throughput problem. These are performance measurements, not training or
 strength gains. The [integrated production pipeline](docs/integrated-overnight.md)
 passed 96 Python tests, exact native comparisons and GPU numerical/recovery checks.
 Bulk inference added 18.7% / 27.1% throughput at full-search 1,024 / 2,048 over
-the graphed Rust baseline. A fresh matched training study started on 28 October at 08:47 EDT with the
-measured runtime; its held-out learning results are pending. The requested
-overnight training did not start overnight; the report records actual launch times.
+the graphed Rust baseline. The fresh matched study completed both 16,384-game
+branches and all 2,000 held-out games on 28 October. Against Pentobi 4 at equal
+2,048 playing simulations, parent/control/teacher scores were 30.25% / 44.0% /
+43.75%. The primary teacher–parent improvement was +13.5 percentage points
+(nominal paired 95% interval +5.5 to +21.5); extra teacher search did not show an
+advantage over control. Neither branch established a majority score against
+level 4. All 1,200 external traces were replayed; the 800 head-to-head outcomes
+and counters were audited without saved traces. All app attempts metered $6.83;
+compute is stopped. Replication is recommended before scaling. The report records
+the actual 08:47–11:18 EDT morning run, which did not start overnight.
 See the [protocol](docs/continuation-status.md) for settings, costs and limitations.
-To play the selected agent at the fast 128-simulation budget:
+To play the earlier preserved parent at the fast 128-simulation budget:
 `.venv/bin/blokus-rl duo-play runs/duo-continuation-final-20261026T2007/duo-continuation-865/frozen-strong1024.pt --simulations 128`.
 Use `--simulations 2048` for the stronger playing budget from the sweep.
 Earlier checkpoints remain preserved. Training entry point:

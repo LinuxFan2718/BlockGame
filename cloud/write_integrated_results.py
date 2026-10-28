@@ -28,8 +28,8 @@ def main():
     result = json.loads(args.verification.read_text())
     names = {
         "parent": "Preserved parent",
-        "control1024": "Control1,024",
-        "teacher2048": "Teacher2,048",
+        "control1024": "Control 1,024",
+        "teacher2048": "Teacher 2,048",
     }
     colors = ["#718096", "#277c9e", "#b46a39"]
     fig, axes = plt.subplots(1, 2, figsize=(9.0, 3.8), constrained_layout=True)
@@ -56,7 +56,7 @@ def main():
     axes[0].axhline(50, color="#999999", linewidth=0.8, linestyle="--")
     axes[0].set(
         xticks=[0, 1],
-        xticklabels=["Pentobi3", "Pentobi4"],
+        xticklabels=["Pentobi 3", "Pentobi 4"],
         ylabel="Score %, draws half",
         ylim=(0, 100),
     )
@@ -79,23 +79,25 @@ def main():
     axes[1].set(
         yticks=np.arange(3),
         yticklabels=labels,
-        xlabel="Paired Pentobi4 difference, percentage points",
+        xlabel="Paired Pentobi 4 difference, percentage points",
     )
     axes[1].invert_yaxis()
     for ax in axes:
         ax.spines[["top", "right"]].set_visible(False)
-    fig.suptitle("Fresh seed1070: held-out results at equal2,048 playing simulations")
-    fig.supxlabel(
-        "100 opening pairs; nominal95% intervals (zero scores: one-sided upper); one training seed",
-        fontsize=9,
-    )
+    fig.suptitle("Fresh seed 1070: held-out results at equal 2,048 playing simulations")
+    caption = "100 whole-opening pairs; nominal 95% bootstrap intervals; one parent/training seed"
+    if any(
+        row.get("zero_score_one_sided_95_upper") is not None for row in result["external"].values()
+    ):
+        caption += " (zero scores: one-sided upper)"
+    fig.supxlabel(caption, fontsize=9)
     figure = ROOT / "docs/assets/integrated-training-results.png"
     fig.savefig(figure, dpi=180)
     lines = [
         "\n## Verified full-study results\n",
-        f"Primary verdict: **{result['primary_verdict']}**. All1,200 external action traces were independently replayed. All800 head-to-head outcomes and counters were audited; those games have no saved action traces.\n",
+        f"Primary verdict: **{result['primary_verdict']}**. All 1,200 external action traces were independently replayed. All 800 head-to-head outcomes and counters were audited; those games have no saved action traces.\n",
         "![Held-out results](assets/integrated-training-results.png)\n",
-        "| Case | W–D–L | Win rate | Score (draw half) | Nominal95% score interval | Mean margin | Game seconds | Actual actor simulations | Neural positions |",
+        "| Case | W–D–L | Win rate | Score (draw half) | Nominal 95% score interval | Mean margin | Game seconds | Actual actor simulations | Neural positions |",
         "|---|---:|---:|---:|---:|---:|---:|---:|---:|",
     ]
     for name in names:
@@ -103,16 +105,16 @@ def main():
             row = result["external"][f"{name}-pentobi{level}"]
             ci = interval(row["score_rate_95pct_cluster_bootstrap"])
             if row.get("zero_score_one_sided_95_upper") is not None:
-                ci = "All zero; conservative one-sided95% upper " + pct(
+                ci = "All zero; conservative one-sided 95% upper " + pct(
                     row["zero_score_one_sided_95_upper"]
                 )
             metrics = row["policy_metrics"]
             lines.append(
-                f"| {names[name]} vs level{level} | {row['wins']}–{row['draws']}–{row['losses']} | {pct(row['wins'] / row['games'])} | {pct(row['score_rate'])} | {ci} | {row['mean_margin']:.2f} | {row['sum_game_seconds']:.1f} | {metrics['simulations']:,} | {metrics['neural_positions']:,} |"
+                f"| {names[name]} vs level {level} | {row['wins']}–{row['draws']}–{row['losses']} | {pct(row['wins'] / row['games'])} | {pct(row['score_rate'])} | {ci} | {row['mean_margin']:.2f} | {row['sum_game_seconds']:.1f} | {metrics['simulations']:,} | {metrics['neural_positions']:,} |"
             )
     lines += [
-        "\nAll cases use2,048 simulations per searched actor decision. Game seconds include both agents and game work, not pure neural or GPU latency.\n",
-        "| Paired comparison | Score difference | Nominal95% whole-opening interval |",
+        "\nAll cases use 2,048 simulations per searched actor decision. Game seconds include both agents and game work, not pure neural or GPU latency.\n",
+        "| Paired comparison | Score difference | Nominal 95% whole-opening interval |",
         "|---|---:|---:|",
     ]
     for name, row in result["paired_differences"].items():
@@ -128,7 +130,7 @@ def main():
             f"| {names[name]} | {row['rounds']} / {row['games']:,} | {row['new_training_positions']:,} | {row['gradient_steps']:,} | {row['simulations']:,} | {row['collect_seconds']:.1f} | {row['training_seconds']:.1f} | {row['elapsed_seconds']:.1f} / {row['soft_cap_seconds']} | {row['selected_additional_round']} / {row['selected_additional_games']:,} |"
         )
     lines += [
-        "\n| Head-to-head | W–D–L | Score | Nominal95% whole-opening interval | Mean margin | Seconds |",
+        "\n| Head-to-head | W–D–L | Score | Nominal 95% whole-opening interval | Mean margin | Seconds |",
         "|---|---:|---:|---:|---:|---:|",
     ]
     for name, row in result["head_to_head"].items():
@@ -143,15 +145,20 @@ def main():
     for name, cost in result["provider_metering_usd"].items():
         lines.append(f"| {name} | ${cost} |")
     lines += [
-        f"\nCombined net reservation: ${result['reserved_usd']:.8f} under$23; reservation is not actual spend. Whole study helper runtime: {result['finished']['seconds']:.1f}s. Billing and app lifetime are separate.\n",
+        f"\nCombined net reservation: ${result['reserved_usd']:.8f} under $23; reservation is not actual spend. Whole study helper runtime: {result['finished']['seconds']:.1f}s. Billing and app lifetime are separate.\n",
         "A promising primary outcome warrants an independently seeded replication with a prespecified budget; an inconclusive or negative result warrants diagnosis before further training. No next paid run was launched automatically.\n",
     ]
     target = ROOT / "docs/integrated-overnight.md"
     text = target.read_text()
     marker = "\n## Verified full-study results\n"
+    tail = ""
     if marker in text:
-        text = text[: text.index(marker)]
-    target.write_text(text + "\n".join(lines) + "\n")
+        start = text.index(marker)
+        notes = text.find("\n## Interpretation, experience and resource limits\n", start)
+        if notes >= 0:
+            tail = text[notes:]
+        text = text[:start]
+    target.write_text(text + "\n".join(lines) + "\n" + tail)
     print(figure)
 
 
