@@ -1,0 +1,23 @@
+{
+  "passed": true,
+  "offline_launch_guard_tests": 4,
+  "historical_fixture_report_plot_smoke": true,
+  "only_config_changes": {
+    "seed": [
+      1070,
+      1071
+    ],
+    "validation_seed": [
+      2607300,
+      2608300
+    ],
+    "test_seed": [
+      2607900,
+      2608900
+    ]
+  },
+  "books_disjoint": true,
+  "preserved_models_checked": 35,
+  "initial_replay_tensor_sha256": "1dc138416d38da772bc4d1b9f569b211b3cfe773d183cb27ca4e0569a604e045",
+  "new_gpu_work_launched_by_these_checks": false
+}
