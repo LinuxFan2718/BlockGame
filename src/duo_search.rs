@@ -169,9 +169,12 @@ impl Search {
                     q + self.exploration * node.priors[i] * scale / (1.0 + count as f32)
                 };
                 let mut best = 0;
+                let mut best_priority = priority(0);
                 for i in 1..node.actions.len() {
-                    if priority(i) > priority(best) {
+                    let candidate_priority = priority(i);
+                    if candidate_priority > best_priority {
                         best = i;
+                        best_priority = candidate_priority;
                     }
                 }
                 let child = if let Some(child) = node.children[best] {

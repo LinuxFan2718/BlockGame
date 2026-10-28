@@ -1,5 +1,7 @@
 """Batched paired-opening evaluation for expensive spatial policies."""
 
+import contextlib
+import contextvars
 import hashlib
 import json
 import time
@@ -15,6 +17,19 @@ from .duo_learning import choose
 from .duo_mcts import evaluate_records, search_games
 from .duo_shared import evaluate_indexed, indexed
 
+_BACKEND = contextvars.ContextVar("duo_evaluation_backend", default="eager")
+
+
+@contextlib.contextmanager
+def evaluation_backend(backend):
+    if backend not in ("eager", "cuda_graphs"):
+        raise ValueError("unknown evaluation backend")
+    token = _BACKEND.set(backend)
+    try:
+        yield
+    finally:
+        _BACKEND.reset(token)
+
 
 class IndexedSearchPolicy:
     def __init__(self, model, simulations=128, precision="float32"):
@@ -29,6 +44,7 @@ class IndexedSearchPolicy:
                 self.simulations,
                 8,
                 evaluator=self.evaluator,
+                indexed_features=self.evaluator.compact_native,
                 metrics=self.metrics,
             )[0].action()
         observation, actions, candidates = decision(game)
@@ -113,12 +129,27 @@ def evaluate_pentobi(
     return result
 
 
-def evaluator_for(model, precision="float32"):
+def evaluator_for(model, precision="float32", inference_backend=None):
+    spatial = getattr(model, "architecture", "additive") in ("residual", "conv")
+    backend = _BACKEND.get() if inference_backend is None else inference_backend
+    if backend not in ("eager", "cuda_graphs"):
+        raise ValueError("unknown evaluation backend")
+    graph = None
+    if backend == "cuda_graphs" and spatial:
+        from .duo_cuda_graphs import FrozenGraphEvaluator
+
+        graph = FrozenGraphEvaluator(model, fallback=evaluate_indexed, precision=precision)
+        graph.prepare()
+
     def evaluate(rows):
-        if getattr(model, "architecture", "additive") in ("residual", "conv"):
-            return evaluate_indexed(model, indexed(rows), precision)
+        if spatial:
+            return (
+                graph(indexed(rows)) if graph else evaluate_indexed(model, indexed(rows), precision)
+            )
         return evaluate_records(model, rows)
 
+    evaluate.compact_native = spatial
+    evaluate.graph = graph
     return evaluate
 
 
@@ -133,12 +164,15 @@ def evaluate_many(
     live_games=32,
     seed=2563000,
     precision="float32",
+    inference_backend=None,
 ):
     started = time.monotonic()
     outcomes = np.zeros((len(openings), 2))
     margins, metrics = [], {}
-    evaluators = [evaluator_for(policy, precision)]
-    evaluators.append(None if isinstance(opponent, str) else evaluator_for(opponent, precision))
+    evaluators = [evaluator_for(policy, precision, inference_backend)]
+    evaluators.append(
+        None if isinstance(opponent, str) else evaluator_for(opponent, precision, inference_backend)
+    )
     jobs = [(i, seat) for i in range(len(openings)) for seat in (0, 1)]
     for offset in range(0, len(jobs), live_games):
         subset = jobs[offset : offset + live_games]
@@ -168,6 +202,7 @@ def evaluate_many(
                         8,
                         128,
                         evaluator=evaluators[agent],
+                        indexed_features=evaluators[agent].compact_native,
                         metrics=metrics,
                     )
                     actions = [r.action() for r in results]

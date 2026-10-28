@@ -54,6 +54,7 @@ struct Catalog {
     pieces: Vec<Shape>,
     orientations: Vec<Orientation>,
     placements: Vec<Option<Placement>>,
+    by_cell: Vec<Vec<usize>>,
 }
 
 fn normalize(mut cells: Shape) -> Shape {
@@ -150,10 +151,17 @@ fn catalog() -> &'static Catalog {
                 }
             }
         }
+        let mut by_cell = vec![Vec::new(); CELLS];
+        for p in placements.iter().flatten() {
+            for &cell in &p.cells {
+                by_cell[cell].push(p.action);
+            }
+        }
         Catalog {
             pieces,
             orientations,
             placements,
+            by_cell,
         }
     })
 }
@@ -280,7 +288,7 @@ impl Game {
             STARTS.iter().any(|&cell| p.mask.contains(cell))
         }
     }
-    pub fn legal_actions(&self) -> Vec<usize> {
+    pub fn legal_actions_scan(&self) -> Vec<usize> {
         if self.terminal {
             return vec![];
         }
@@ -296,6 +304,49 @@ impl Game {
         }
         actions
     }
+
+    pub fn legal_actions(&self) -> Vec<usize> {
+        if self.terminal {
+            return vec![];
+        }
+        let mut anchors = Bits::default();
+        if self.last_piece[self.turn].is_some() {
+            for i in 0..4 {
+                anchors.0[i] = self.corners[self.turn].0[i]
+                    & !(self.edges[self.turn].0[i] | self.occupied.0[i]);
+            }
+        } else {
+            for cell in self.required_starts() {
+                anchors.insert(cell);
+            }
+        }
+        let mut seen = [0_u64; PASS.div_ceil(64)];
+        let mut actions = Vec::new();
+        for word in 0..4 {
+            let mut bits = anchors.0[word];
+            while bits != 0 {
+                let cell = word * 64 + bits.trailing_zeros() as usize;
+                bits &= bits - 1;
+                for &action in &catalog().by_cell[cell] {
+                    let bit = 1_u64 << (action % 64);
+                    if seen[action / 64] & bit != 0 {
+                        continue;
+                    }
+                    seen[action / 64] |= bit;
+                    let placement = catalog().placements[action].as_ref().unwrap();
+                    if self.legal_placement(placement) {
+                        actions.push(action);
+                    }
+                }
+            }
+        }
+        actions.sort_unstable(); // Preserve the canonical ordering and tie breaks.
+        if actions.is_empty() {
+            actions.push(PASS);
+        }
+        actions
+    }
+
     /// The score is meaningful at any point, but determines the winner only at termination.
     pub fn scores(&self) -> [i16; 2] {
         std::array::from_fn(|player| {
@@ -321,12 +372,7 @@ impl Game {
             return Err(MoveError::GameOver);
         }
         if action == PASS {
-            if catalog()
-                .placements
-                .iter()
-                .flatten()
-                .any(|p| self.legal_placement(p))
-            {
+            if self.legal_actions().first() != Some(&PASS) {
                 return Err(MoveError::MustPlace);
             }
             self.passes += 1;
@@ -399,6 +445,26 @@ impl fmt::Display for Game {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn indexed_actions_match_scan_through_random_games() {
+        let mut seed = 1070_u64;
+        let mut passes = 0;
+        for _ in 0..64 {
+            let mut game = Game::new();
+            while !game.is_terminal() {
+                let actions = game.legal_actions();
+                assert_eq!(actions, game.legal_actions_scan());
+                seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1);
+                let action = actions[(seed >> 32) as usize % actions.len()];
+                if action == PASS {
+                    passes += 1;
+                }
+                game.step(action).unwrap();
+            }
+            assert_eq!(game.legal_actions(), game.legal_actions_scan());
+        }
+        assert!(passes >= 128);
+    }
     #[test]
     fn completion_bonuses() {
         let mut game = Game::new();

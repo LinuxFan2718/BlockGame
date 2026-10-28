@@ -7,7 +7,7 @@ import numpy as np
 import torch
 
 from ._native import DuoSearch
-from .duo_env import decode_decision, legacy_decision
+from .duo_env import decode_decision, decode_indexed_decision, legacy_decision
 from .duo_indices import policy_indices
 from .duo_learning import pack
 
@@ -46,6 +46,7 @@ def search_games(
     noise_mass=10.0,
     metrics=None,
     native_features=True,
+    indexed_features=False,
     evaluator=None,
 ):
     if simulations < 1 or leaf_batch < 1 or inference_batch < 1:
@@ -56,6 +57,8 @@ def search_games(
         raise ValueError("one root-noise RNG per game required")
     if not 0 <= root_noise <= 1 or noise_mass <= 0:
         raise ValueError("invalid root noise")
+    if indexed_features and (not native_features or evaluator is None):
+        raise ValueError("indexed leaves require native features and an indexed evaluator")
     if evaluator is None:
 
         def evaluator(records):
@@ -73,19 +76,32 @@ def search_games(
                 continue
             budget = min(leaf_batch, remaining)
             entries = (
-                [(token, decode_decision(data)) for token, data in tree.request_decisions(budget)]
+                [
+                    (token, decode_indexed_decision(data))
+                    for token, data in tree.request_indexed_decisions(budget)
+                ]
+                if indexed_features
+                else [
+                    (token, decode_decision(data)) for token, data in tree.request_decisions(budget)
+                ]
                 if native_features
                 else [(token, legacy_decision(game)) for token, game in tree.request(budget)]
             )
             for token, (observation, actions, candidates) in entries:
-                indices = policy_indices(actions, int(observation[630] == 0))
+                indices = (
+                    candidates
+                    if indexed_features
+                    else policy_indices(actions, int(observation[630] == 0))
+                )
                 record = {
                     "observation": observation,
-                    "candidates": candidates,
+                    **({} if indexed_features else {"candidates": candidates}),
                     "indices": indices,
                 }
                 pending.append((index, token, record, len(actions)))
                 if token == 0:
+                    if indexed_features:
+                        _, _, candidates = legacy_decision(games[index])
                     roots[index] = (observation, actions, candidates, indices)
         for offset in range(0, len(pending), inference_batch):
             subset = pending[offset : offset + inference_batch]

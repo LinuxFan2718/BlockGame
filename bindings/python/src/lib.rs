@@ -91,6 +91,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PyDuoGame>()?;
     module.add_class::<PyDuoSearch>()?;
     module.add_function(wrap_pyfunction!(duo_pieces, module)?)?;
+    module.add_function(wrap_pyfunction!(duo_policy_indices, module)?)?;
     Ok(())
 }
 
@@ -206,6 +207,17 @@ fn duo_pieces() -> Vec<Vec<(i8, i8)>> {
     duo::pieces().to_vec()
 }
 
+#[pyfunction]
+fn duo_policy_indices(actions: Vec<usize>, player: usize) -> PyResult<Vec<u16>> {
+    actions
+        .into_iter()
+        .map(|action| {
+            duo_features::policy_index(action, player)
+                .ok_or_else(|| PyValueError::new_err("unknown placement or player"))
+        })
+        .collect()
+}
+
 #[pyclass(name = "DuoSearch")]
 struct PyDuoSearch {
     inner: duo_search::Search,
@@ -251,6 +263,29 @@ impl PyDuoSearch {
                     .map(|(token, game)| {
                         let actions = self.inner.pending_actions(token)?;
                         Ok((token, duo_features::encode(&game, actions)))
+                    })
+                    .collect::<Result<Vec<_>, String>>()
+            })
+            .map_err(PyValueError::new_err)?;
+        Ok(encoded
+            .into_iter()
+            .map(|(token, data)| (token, duo_features::buffers(py, data)))
+            .collect())
+    }
+    /// Indexed spatial leaves omit six geometry integers per legal candidate.
+    fn request_indexed_decisions(
+        &mut self,
+        py: Python<'_>,
+        budget: usize,
+    ) -> PyResult<Vec<(usize, duo_features::Buffers)>> {
+        let encoded = py
+            .detach(|| {
+                self.inner
+                    .request(budget)?
+                    .into_iter()
+                    .map(|(token, game)| {
+                        let actions = self.inner.pending_actions(token)?;
+                        Ok((token, duo_features::encode_indexed(&game, actions)))
                     })
                     .collect::<Result<Vec<_>, String>>()
             })

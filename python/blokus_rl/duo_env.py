@@ -66,6 +66,15 @@ def decode_decision(buffers):
     )
 
 
+def decode_indexed_decision(buffers):
+    observation, actions, indices = buffers
+    return (
+        np.frombuffer(observation, dtype="<f4"),
+        np.frombuffer(actions, dtype="<i4"),
+        np.frombuffer(indices, dtype="<u2"),
+    )
+
+
 def legacy_decision(game: DuoGame):
     """Independent reference encoding retained for exact compatibility checks."""
     if game.terminated:

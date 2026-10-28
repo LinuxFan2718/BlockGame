@@ -12,6 +12,7 @@ import numpy as np
 import torch
 
 from .duo_env import PASS, STATE_SIZE
+from .duo_inference import fill_blocks
 
 BATCH_BUCKETS = (8, 16, 32, 64, 128, 256)
 WIDTH_BUCKETS = (64, 256, 1024, 2048)
@@ -100,6 +101,18 @@ class GraphBucket:
     @torch.no_grad()
     def evaluate(self, records):
         n, width = self.stage(records)
+        return self.finish(n, width)
+
+    @torch.no_grad()
+    def evaluate_blocks(self, blocks):
+        n, width = fill_blocks(blocks, *self.host_arrays)
+        self.observations.copy_(self.host_observations, non_blocking=True)
+        self.indices.copy_(self.host_indices, non_blocking=True)
+        self.mask.copy_(self.host_mask, non_blocking=True)
+        return self.finish(n, width)
+
+    @torch.no_grad()
+    def finish(self, n, width):
         self.graph.replay()
         self.host_probabilities.copy_(self.probabilities, non_blocking=True)
         self.host_values.copy_(self.values, non_blocking=True)
@@ -140,6 +153,24 @@ class FrozenGraphEvaluator:
         self.padded_positions += batch_bucket
         self.shapes[str(key)] = self.shapes.get(str(key), 0) + 1
         return self.graphs[key].evaluate(records)
+
+    def evaluate_blocks(self, blocks):
+        n, width = sum(map(len, blocks)), max(b.width for b in blocks)
+        batch_bucket, width_bucket = bucket(n, BATCH_BUCKETS), bucket(width, WIDTH_BUCKETS)
+        self.calls += 1
+        self.positions += n
+        if batch_bucket is None or width_bucket is None:
+            self.fallback_calls += 1
+            self.fallback_positions += n
+            return self.fallback(
+                self.model, [r for b in blocks for r in b.records()], self.precision
+            )
+        key = batch_bucket, width_bucket
+        if key not in self.graphs:
+            self.graphs[key] = GraphBucket(self.model, *key, precision=self.precision)
+        self.padded_positions += batch_bucket
+        self.shapes[str(key)] = self.shapes.get(str(key), 0) + 1
+        return self.graphs[key].evaluate_blocks(blocks)
 
     def counters(self):
         return {

@@ -123,11 +123,21 @@ def train(
     stop_after_round=None,
     inference_transport="shared_memory",
     inference_cache_entries=0,
+    inference_backend="eager",
+    evaluation_backend="eager",
+    bulk_inference=True,
+    compact_native=True,
+    ready_batching=True,
 ):
     out, reference = Path(out), Path(reference)
     runtime = {
         "inference_transport": inference_transport,
         "inference_cache_entries": inference_cache_entries,
+        "inference_backend": inference_backend,
+        "evaluation_backend": evaluation_backend,
+        "bulk_inference": bulk_inference,
+        "compact_native": compact_native,
+        "ready_batching": ready_batching,
     }
     configure_torch(config.seed)
     if config.device == "cuda":
@@ -189,7 +199,13 @@ def train(
     last_round_seconds, last_round = 0.0, start_round - 1
     reason = "round_limit"
     with SharedSearchPool(
-        config, transport=inference_transport, cache_entries=inference_cache_entries
+        config,
+        transport=inference_transport,
+        cache_entries=inference_cache_entries,
+        inference_backend=inference_backend,
+        bulk_inference=bulk_inference,
+        compact_native=compact_native,
+        ready_batching=ready_batching,
     ) as pool:
         for round_ in range(start_round, config.rounds + 1):
             elapsed = previous_seconds + time.monotonic() - started
@@ -226,6 +242,7 @@ def train(
                     opponent_simulations=config.validation_simulations,
                     seed=config.validation_seed,
                     precision=config.precision,
+                    inference_backend=evaluation_backend,
                 )
                 row["validation"] = result
                 if result["score_rate"] > best:
@@ -293,6 +310,7 @@ def train(
             opponent_simulations=config.validation_simulations,
             seed=config.validation_seed,
             precision=config.precision,
+            inference_backend=evaluation_backend,
         )
         if result["score_rate"] > best:
             best = result["score_rate"]
@@ -322,6 +340,8 @@ def main():
         "--inference-transport", choices=("queue", "shared_memory"), default="shared_memory"
     )
     parser.add_argument("--inference-cache-entries", type=int, default=0)
+    parser.add_argument("--inference-backend", choices=("eager", "cuda_graphs"), default="eager")
+    parser.add_argument("--evaluation-backend", choices=("eager", "cuda_graphs"), default="eager")
     defaults = asdict(DeepConfig())
     for name, value in defaults.items():
         parser.add_argument("--" + name.replace("_", "-"), type=type(value), default=value)
@@ -334,6 +354,8 @@ def main():
         resume=args.resume,
         inference_transport=args.inference_transport,
         inference_cache_entries=args.inference_cache_entries,
+        inference_backend=args.inference_backend,
+        evaluation_backend=args.evaluation_backend,
     )
 
 

@@ -16,7 +16,8 @@ import numpy as np
 import torch
 
 from ._native import DuoGame
-from .duo_inference import FrozenEvaluationCache, InferenceBuffer
+from .duo_env import STATE_SIZE
+from .duo_inference import FrozenEvaluationCache, InferenceBuffer, fill_blocks, slice_blocks
 from .duo_mcts import search_games
 from .duo_residual import candidate_indices_numpy
 from .learning import configure_torch
@@ -67,11 +68,34 @@ def evaluate_indexed(model, records, precision="float32"):
     return probabilities, values
 
 
+@torch.no_grad()
+def evaluate_blocks(model, blocks, precision="float32"):
+    n, width = sum(map(len, blocks)), max(b.width for b in blocks)
+    observation = np.empty((n, STATE_SIZE), np.float32)
+    indices = np.empty((n, width), np.int64)
+    mask = np.empty((n, width), bool)
+    fill_blocks(blocks, observation, indices, mask)
+    device = next(model.parameters()).device
+    with precision_context(model, precision):
+        scores, values = model(torch.from_numpy(observation).to(device))
+        logits = (
+            scores.gather(-1, torch.from_numpy(indices).to(device))
+            .float()
+            .masked_fill(~torch.from_numpy(mask).to(device), -torch.inf)
+        )
+        probabilities = torch.softmax(logits, -1).cpu().numpy()
+        values = values.flatten().clamp(-1, 1).float().cpu().numpy()
+    if not np.isfinite(probabilities).all() or not np.isfinite(values).all():
+        raise RuntimeError("nonfinite block inference")
+    return probabilities, values
+
+
 class RemoteEvaluator:
     def __init__(self, worker, requests, responses, buffer=None):
         self.worker, self.requests, self.responses = worker, requests, responses
         self.buffer = buffer
         self.sequence = 0
+        self.compact_native = False
 
     def __call__(self, records):
         sequence = self.sequence
@@ -80,7 +104,7 @@ class RemoteEvaluator:
             self.requests.put(("evaluate", self.worker, sequence, indexed(records)))
             reply_sequence, probabilities, values = self.responses.get(timeout=180)
         else:
-            self.buffer.write_request(indexed(records))
+            self.buffer.write_request(records if self.compact_native else indexed(records))
             self.requests.put(("evaluate_shm", self.worker, sequence, len(records)))
             reply_sequence, width = self.responses.get(timeout=180)
             probabilities, values = self.buffer.read_response(len(records), width)
@@ -113,6 +137,7 @@ def collect(config, seed, count, evaluator):
                     rngs=[rngs[i] for i in ids] if full else None,
                     metrics=metrics,
                     evaluator=evaluator,
+                    indexed_features=getattr(evaluator, "compact_native", False),
                 )
                 for i, result in zip(ids, results, strict=True):
                     if full:
@@ -145,10 +170,13 @@ def collect(config, seed, count, evaluator):
     return records, scores, metrics
 
 
-def worker_main(worker, config, tasks, requests, responses, buffer_descriptor=None):
+def worker_main(
+    worker, config, tasks, requests, responses, buffer_descriptor=None, compact_native=False
+):
     configure_torch(config.seed + worker)
     buffer = InferenceBuffer(**buffer_descriptor) if buffer_descriptor else None
     evaluator = RemoteEvaluator(worker, requests, responses, buffer)
+    evaluator.compact_native = compact_native
     try:
         while (task := tasks.get()) is not None:
             round_, count = task
@@ -163,10 +191,25 @@ def worker_main(worker, config, tasks, requests, responses, buffer_descriptor=No
 
 
 class SharedSearchPool:
-    def __init__(self, config, *, transport="shared_memory", cache_entries=0):
+    def __init__(
+        self,
+        config,
+        *,
+        transport="shared_memory",
+        cache_entries=0,
+        inference_backend="eager",
+        bulk_inference=True,
+        compact_native=True,
+        ready_batching=True,
+    ):
         if transport not in ("queue", "shared_memory"):
             raise ValueError("unknown inference transport")
         self.config = config
+        if inference_backend not in ("eager", "cuda_graphs"):
+            raise ValueError("unknown inference backend")
+        self.inference_backend, self.compact_native = inference_backend, compact_native
+        self.bulk_inference = bulk_inference and transport == "shared_memory" and cache_entries == 0
+        self.ready_batching = ready_batching
         self.transport, self.cache_entries = transport, cache_entries
         self.context = mp.get_context("spawn")
         self.requests = self.context.Queue(maxsize=config.workers * 2)
@@ -193,6 +236,7 @@ class SharedSearchPool:
                         self.requests,
                         self.responses[worker],
                         buffer.descriptor() if buffer else None,
+                        self.compact_native,
                     ),
                 )
                 process.start()
@@ -224,6 +268,17 @@ class SharedSearchPool:
 
     def collect(self, model, round_, count):
         config = self.config
+        graph = None
+        if self.inference_backend == "cuda_graphs":
+            from .duo_cuda_graphs import FrozenGraphEvaluator
+
+            if model.training:
+                raise ValueError("captured collection requires eval mode")
+            graph = FrozenGraphEvaluator(
+                model, fallback=evaluate_indexed, precision=config.precision
+            )
+            # Rebuild for every frozen collection generation, after any optimizer update.
+            graph.prepare()
         for worker, task in enumerate(self.tasks):
             n = count // config.workers + int(worker < count % config.workers)
             task.put((round_, n))
@@ -235,7 +290,11 @@ class SharedSearchPool:
 
         def receive(timeout):
             try:
-                return self.requests.get(timeout=timeout)
+                return (
+                    self.requests.get_nowait()
+                    if timeout == 0
+                    else self.requests.get(timeout=timeout)
+                )
             except queue.Empty:
                 if time.monotonic() - started > config.round_timeout_seconds:
                     raise TimeoutError("self-play round exceeded its bounded deadline") from None
@@ -253,6 +312,13 @@ class SharedSearchPool:
                 return None
             if message[0] == "evaluate_shm":
                 _, worker, sequence, count = message
+                if self.bulk_inference:
+                    return (
+                        "evaluate_block",
+                        worker,
+                        sequence,
+                        self.buffers[worker].read_block(count),
+                    )
                 return ("evaluate", worker, sequence, self.buffers[worker].read_request(count))
             if message[0] != "evaluate":
                 raise RuntimeError("unknown worker message")
@@ -270,21 +336,30 @@ class SharedSearchPool:
             batch_requests = [request]
             size = len(request[3])
             deadline = time.monotonic() + config.batch_wait_ms / 1000
-            while size < config.inference_batch and time.monotonic() < deadline:
-                message = receive(max(0.00001, deadline - time.monotonic()))
+            while size < config.inference_batch:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0 and not (config.batch_wait_ms == 0 and self.ready_batching):
+                    break
+                message = receive(0 if remaining <= 0 else max(0.00001, remaining))
                 if message is None:
                     break
                 request = handle(message)
                 if request is not None:
                     batch_requests.append(request)
                     size += len(request[3])
+            if self.bulk_inference:
+                self.serve_blocks(batch_requests, model, graph, metrics)
+                continue
             rows = [row for request in batch_requests for row in request[3]]
             probabilities, values = [], []
             start = time.monotonic()
             for offset in range(0, len(rows), config.inference_batch):
                 subset = rows[offset : offset + config.inference_batch]
                 p, v, counters = cache.evaluate(
-                    subset, lambda rows: evaluate_indexed(model, rows, config.precision)
+                    subset,
+                    graph
+                    if graph
+                    else lambda rows: evaluate_indexed(model, rows, config.precision),
                 )
                 probabilities.extend(
                     p[i, : len(row["indices"])].copy() for i, row in enumerate(subset)
@@ -319,5 +394,51 @@ class SharedSearchPool:
         if len(scores) != count:
             raise RuntimeError("collection game accounting mismatch")
         metrics["collect_seconds"] = time.monotonic() - started
+        if graph:
+            counters = graph.counters()
+            metrics.update(
+                graph_capture_seconds=counters["capture_seconds"],
+                graph_requested_positions=counters["requested_positions"],
+                graph_padded_positions=counters["padded_positions"],
+                graph_fallback_positions=counters["fallback_positions"],
+            )
         metrics["mean_gpu_batch"] = metrics["gpu_positions"] / max(metrics["gpu_batches"], 1)
         return records, scores, metrics
+
+    def serve_blocks(self, requests, model, graph, metrics):
+        blocks = [r[3] for r in requests]
+        n, width = sum(map(len, blocks)), max(b.width for b in blocks)
+        started = time.monotonic()
+        function = (
+            graph.evaluate_blocks
+            if graph
+            else lambda b: evaluate_blocks(model, b, self.config.precision)
+        )
+        probabilities = values = None
+        if n > self.config.inference_batch:
+            probabilities, values = np.zeros((n, width), np.float32), np.empty(n, np.float32)
+        for start in range(0, n, self.config.inference_batch):
+            end = min(n, start + self.config.inference_batch)
+            p, v = function(slice_blocks(blocks, start, end))
+            if probabilities is None:
+                probabilities, values = p, v
+            else:
+                probabilities[start:end, : p.shape[1]], values[start:end] = p, v
+            metrics["gpu_batches"] += 1
+        metrics["gpu_positions"] += n
+        for key, value in (
+            ("cache_misses", n),
+            ("cache_hits", 0),
+            ("cache_evictions", 0),
+            ("bulk_requests", len(requests)),
+        ):
+            metrics[key] = metrics.get(key, 0) + value
+        metrics["inference_seconds"] += time.monotonic() - started
+        offset = 0
+        for _, worker, sequence, block in requests:
+            end = offset + len(block)
+            reply_width = self.buffers[worker].write_response(
+                probabilities[offset:end, : block.width], values[offset:end]
+            )
+            self.responses[worker].put((sequence, reply_width))
+            offset = end

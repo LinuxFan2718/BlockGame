@@ -1,11 +1,88 @@
 """Bounded inference buffers and a cache for one frozen model generation."""
 
 from collections import OrderedDict
+from dataclasses import dataclass
 from multiprocessing.shared_memory import SharedMemory
 
 import numpy as np
 
 from .duo_env import PASS, STATE_SIZE
+
+
+@dataclass
+class IndexedBlock:
+    """Borrowed views of one outstanding worker request, valid until its reply."""
+
+    observations: np.ndarray
+    indices: np.ndarray
+    counts: np.ndarray
+
+    def __len__(self):
+        return len(self.counts)
+
+    @property
+    def width(self):
+        return int(self.counts.max())
+
+    def slice(self, start, end):
+        return IndexedBlock(
+            self.observations[start:end], self.indices[start:end], self.counts[start:end]
+        )
+
+    def records(self):
+        return [
+            {"observation": obs, "indices": ids[: int(n)]}
+            for obs, ids, n in zip(self.observations, self.indices, self.counts, strict=True)
+        ]
+
+
+def slice_blocks(blocks, start, end):
+    result, offset = [], 0
+    for block in blocks:
+        lo, hi = max(0, start - offset), min(len(block), end - offset)
+        if lo < hi:
+            result.append(block.slice(lo, hi))
+        offset += len(block)
+    if sum(map(len, result)) != end - start:
+        raise ValueError("block slice exceeds request")
+    return result
+
+
+def fill_blocks(blocks, observations, indices, mask):
+    """Pack whole strided blocks; clear stale padding and keep dummy rows finite."""
+    n = sum(map(len, blocks))
+    if not blocks or not 0 < n <= len(observations):
+        raise ValueError("invalid block batch length")
+    width = max(block.width for block in blocks)
+    if not 0 < width <= indices.shape[1]:
+        raise ValueError("invalid block action width")
+    observations.fill(0)
+    indices.fill(0)
+    mask.fill(False)
+    mask[:, 0] = True
+    offset = 0
+    columns = np.arange(width)[None, :]
+    for block in blocks:
+        end = offset + len(block)
+        if (
+            block.observations.shape != (len(block), STATE_SIZE)
+            or np.any(block.counts < 1)
+            or np.any(block.counts > block.indices.shape[1])
+        ):
+            raise ValueError("invalid indexed block shape/counts")
+        observations[offset:end] = block.observations
+        valid = columns < block.counts[:, None]
+        mask[offset:end, :width] = valid
+        # Stale shared-memory padding is never interpreted as a policy index.
+        block_width = block.width
+        np.copyto(
+            indices[offset:end, :block_width],
+            block.indices[:, :block_width],
+            casting="unsafe",
+            where=valid[:, :block_width],
+        )
+        offset = end
+    return n, width
 
 
 class InferenceBuffer:
@@ -61,6 +138,15 @@ class InferenceBuffer:
             }
             for i in range(count)
         ]
+
+    def read_block(self, count):
+        if not 0 < count <= self.rows:
+            raise ValueError("invalid shared request count")
+        return IndexedBlock(
+            self.arrays["observations"][:count],
+            self.arrays["indices"][:count],
+            self.arrays["counts"][:count],
+        )
 
     def write_response(self, probabilities, values):
         n, width = probabilities.shape

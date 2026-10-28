@@ -1,12 +1,14 @@
 //! Compact observation buffers. No move heuristics or changes to the rules.
 use pyo3::prelude::*;
 use pyo3::types::PyByteArray;
+use std::collections::HashMap;
+use std::sync::OnceLock;
 use tic_tac_toe::duo;
 
 pub type Encoded = (Vec<u8>, Vec<u8>, Vec<u8>);
 pub type Buffers = (Py<PyByteArray>, Py<PyByteArray>, Py<PyByteArray>);
 
-pub fn encode(game: &duo::Game, actions: &[usize]) -> Encoded {
+fn base(game: &duo::Game, actions: &[usize]) -> (Vec<u8>, Vec<u8>) {
     let player = game.current_player().expect("nonterminal decision");
     let relative = |cell: usize| if player == 0 { cell } else { 195 - cell };
     let mut state = [0.0_f32; 634];
@@ -37,6 +39,52 @@ pub fn encode(game: &duo::Game, actions: &[usize]) -> Encoded {
         .iter()
         .flat_map(|&action| (action as u32).to_le_bytes())
         .collect();
+    (observation, ids)
+}
+
+pub fn policy_index(action: usize, player: usize) -> Option<u16> {
+    static INDICES: OnceLock<[Vec<u16>; 2]> = OnceLock::new();
+    if player > 1 || action > duo::PASS {
+        return None;
+    }
+    let table = INDICES.get_or_init(|| {
+        let mut by_cells = HashMap::new();
+        for action in 0..duo::PASS {
+            if let Some(p) = duo::placement(action) {
+                by_cells.insert(p.cells.clone(), action);
+            }
+        }
+        let mut table = [vec![u16::MAX; duo::PASS + 1], vec![u16::MAX; duo::PASS + 1]];
+        for action in 0..duo::PASS {
+            if let Some(p) = duo::placement(action) {
+                let mut rotated: Vec<_> = p.cells.iter().map(|cell| 195 - cell).collect();
+                rotated.sort_unstable();
+                table[0][action] = action as u16;
+                table[1][action] = by_cells[&rotated] as u16;
+            }
+        }
+        table[0][duo::PASS] = duo::PASS as u16;
+        table[1][duo::PASS] = duo::PASS as u16;
+        table
+    });
+    let index = table[player][action];
+    (index != u16::MAX).then_some(index)
+}
+
+pub fn encode_indexed(game: &duo::Game, actions: &[usize]) -> Encoded {
+    let (observation, ids) = base(game, actions);
+    let player = game.current_player().expect("nonterminal decision");
+    let indices = actions
+        .iter()
+        .flat_map(|&action| policy_index(action, player).unwrap().to_le_bytes())
+        .collect();
+    (observation, ids, indices)
+}
+
+pub fn encode(game: &duo::Game, actions: &[usize]) -> Encoded {
+    let (observation, ids) = base(game, actions);
+    let player = game.current_player().expect("nonterminal decision");
+    let relative = |cell: usize| if player == 0 { cell } else { 195 - cell };
     let mut candidates = Vec::with_capacity(actions.len() * 12);
     for &action in actions {
         let mut row = [196_u16; 6];
