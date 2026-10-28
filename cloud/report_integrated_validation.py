@@ -31,7 +31,7 @@ def main():
         json.loads(line)
         for line in (ROOT / "runs/modal-integrated-cost-ledger.jsonl").read_text().splitlines()
     ]
-    assert execution == next(r for r in ledger if r["stage"] == "validate")
+    assert execution == next(r for r in ledger if r["stage"] == execution["stage"])
     manifest = read(ROOT / "runs/integrated-payload-1070-sha256.json")
     assert execution["payload_sha256"] == manifest
     for name, expected in manifest.items():

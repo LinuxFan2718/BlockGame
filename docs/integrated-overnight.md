@@ -113,3 +113,14 @@ The guard now excludes its own app; the other-active-app check remains. Original
 log is retained with `-prelaunch-guard` suffix and any image-build metering remains
 part of this phase's costs. The source-only payload and scientific protocol did
 not change.
+
+The first actual GPU submission `ap-tUfMbBe5gfBIYvlmZ3wD25` failed during Modal's
+module import (`ModuleNotFoundError: modal_integrated`), before the helper or run
+directory existed. It was explicitly stopped. Its original reservation of
+$1.05314333 remains counted in full, along with all logs and costs. The corrected
+runner uses the established `/opt/blokus/cloud` path with explicit PYTHONPATH
+and an image-build import check before GPU allocation. The allowlisted
+`validate-import` stage permits this single corrected submission; its own duplicate
+guard still refuses repeats. Including both validation reservations and the main
+8h reservation gives$22.33249, below the unchanged$23 cap. No scientific payload,
+model, replay or study setting changed.

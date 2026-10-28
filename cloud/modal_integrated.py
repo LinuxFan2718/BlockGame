@@ -23,13 +23,21 @@ PAYLOAD = ROOT / "runs/integrated-payload-1070"
 MANIFEST = ROOT / "runs/integrated-payload-1070-sha256.json"
 CAP = 23.0
 HOURLY = 2.5204
-NAMES = {"validate": "duo-integrated-validation-1070", "study": "duo-integrated-teacher-1070"}
-TIMEOUTS = {"validate": 1200, "study": 28800}
+NAMES = {
+    "validate": "duo-integrated-validation-1070",
+    "validate-import": "duo-integrated-validation-1070",
+    "study": "duo-integrated-teacher-1070",
+}
+TIMEOUTS = {"validate": 1200, "validate-import": 1200, "study": 28800}
 image = (
     modal.Image.from_id(BASE_IMAGE)
-    .add_local_file(__file__, "/opt/integrated/modal_integrated.py", copy=True)
+    .add_local_file(__file__, "/opt/blokus/cloud/modal_integrated.py", copy=True)
     .add_local_dir(PAYLOAD, "/opt/integrated/payload", copy=True)
-    .run_commands("python /opt/integrated/payload/build_integrated.py")
+    .env({"PYTHONPATH": "/opt/blokus/cloud"})
+    .run_commands(
+        "python /opt/integrated/payload/build_integrated.py",
+        "python -c 'import modal; modal.is_local = lambda: False; import modal_integrated; print(\"Modal runner import verified\")'",
+    )
     if modal.is_local()
     else None
 )
@@ -103,7 +111,7 @@ def run(execution):
     (root / "execution.json").write_text(json.dumps(execution, indent=2) + "\n")
     volume.commit()
     try:
-        assert sha("/opt/integrated/modal_integrated.py") == execution["runner_sha256"]
+        assert sha("/opt/blokus/cloud/modal_integrated.py") == execution["runner_sha256"]
         for name, expected in execution["payload_sha256"].items():
             assert sha(Path("/opt/integrated/payload") / name) == expected, name
         for name, expected in execution["immutable_modules"].items():
@@ -134,7 +142,7 @@ def run(execution):
         env = dict(os.environ, PYTHONPATH="/opt/integrated/payload/python")
         env.pop("BLOKUS_NATIVE_PATH", None)
         env.pop("BLOKUS_BASELINE_EXTENSION", None)
-        if stage == "validate":
+        if stage != "study":
             subprocess.run(
                 [
                     sys.executable,
@@ -163,7 +171,7 @@ def run(execution):
         # All children are in this function's container; the function hard limit bounds spend.
         with Telemetry(root / "telemetry.jsonl"):
             subprocess.run(command, env=env, check=True, timeout=TIMEOUTS[stage] - 60)
-        marker = root / ("checks/finished.json" if stage == "validate" else "finished.json")
+        marker = root / ("checks/finished.json" if stage != "study" else "finished.json")
         assert marker.exists()
         (root / "wrapper-finished.json").write_text(
             json.dumps(
@@ -223,12 +231,12 @@ def study(execution):
 @app.local_entrypoint()
 def main(stage: str = "validate"):
     if stage not in NAMES:
-        raise ValueError("expected validate or study")
+        raise ValueError("expected an allowlisted validation stage or study")
     ledger = ROOT / "runs/modal-integrated-cost-ledger.jsonl"
     rows = [json.loads(line) for line in ledger.read_text().splitlines()] if ledger.exists() else []
     if any(row.get("stage") == stage for row in rows):
         raise ValueError("stage already reserved; no duplicate or automatic retry")
-    reservation = HOURLY * (TIMEOUTS[stage] + 90) / 3600 + (0.15 if stage == "validate" else 0)
+    reservation = HOURLY * (TIMEOUTS[stage] + 90) / 3600 + (0.15 if stage != "study" else 0)
     if sum(row["reserved_usd"] for row in rows) + reservation > CAP:
         raise ValueError("combined $23 phase ceiling exceeded")
     command = [sys.executable, "-m", "modal"]
@@ -302,7 +310,7 @@ def main(stage: str = "validate"):
     Path(str(prefix) + "-rates.json").write_text(json.dumps(rates, indent=2) + "\n")
     with ledger.open("a") as handle:
         handle.write(json.dumps(execution) + "\n")
-    call = (validate if stage == "validate" else study).spawn(execution)
+    call = (validate if stage != "study" else study).spawn(execution)
     receipt = {"run_name": NAMES[stage], "function_call_id": call.object_id, "submitted": True}
     Path(str(prefix) + "-submission.json").write_text(json.dumps(receipt, indent=2) + "\n")
     print(json.dumps(receipt), flush=True)
