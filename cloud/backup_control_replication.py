@@ -36,6 +36,7 @@ def main():
     for prefix in (
         ROOT / "runs/integrated-payload-1070",
         *[p for p in (ROOT / "runs").glob("control-replication-profile-*") if p.is_dir()],
+        *[p for p in (ROOT / "runs").glob("control-replication-monitor-*") if p.is_dir()],
         *args.run,
     ):
         if prefix.exists():
