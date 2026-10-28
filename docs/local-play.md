@@ -76,25 +76,24 @@ inference. MPS uses the Mac's GPU; this port does not use the Apple Neural Engin
 [PyTorch MPS](https://docs.pytorch.org/docs/2.14/notes/mps.html),
 [Apple's PyTorch guidance](https://developer.apple.com/metal/pytorch/).
 
-Training on this laptop is possible in principle, but the current production
-trainer has **not been ported to MPS**. Its supported training devices remain CPU
-and CUDA. A correct Metal training port would also need precision/operation
-checks, optimizer validation, and Metal RNG/checkpoint recovery support. This
-inference change deliberately does not relax those scientific/recovery checks.
+The self-play trainer has since been **ported to MPS float32**, with optimizer,
+RNG and interrupted-run recovery tests. See [Metal training and the measured
+L40S comparison](metal-training.md) for commands, results and the explicit
+nondeterministic-kernel limitation. The inference app itself never trains.
 
 | Practical issue | Laptop implication |
 |---|---|
 | Most work is self-play, not gradient updates | The latest Modal control used 131.4 million search simulations and 102.8 million neural evaluations. Optimizer fitting took only 10.2 seconds, versus 1,301.8 seconds collecting games. A fast backward pass alone would not make the study fast. |
-| CUDA-specific runtime | Our CUDA Graphs, CUDA staging and bf16/TF32 production paths do not transfer directly to Metal. This local path uses ordinary eager float32 inference. A complete Metal collection pipeline needs its own profiling. |
+| CUDA-specific runtime | Our CUDA Graphs, CUDA staging and bf16/TF32 production paths do not transfer directly to Metal. The measured eager-float32 M2 collection path was about 6× slower than production L40S; see the matched and production comparisons in the Metal training report. |
 | Small inference batches | Single-game search makes repeated small CPU↔GPU handoffs. Metal is not guaranteed to beat CPU for this small CNN. Use the actual turn-time display; the first GPU turn includes initialization. |
 | Unified memory | The Modal training window peaked at 12.29 GiB host RAM plus about 2.6 GiB GPU memory. Those measurements cannot simply be added to predict M2 use, but on a 16 GB Mac the OS, browser, replay and GPU share a tight budget. Worker count/replay/batches may need reducing, which changes throughput or the protocol. |
-| Sustained work | Long self-play runs compete with normal use and may slow under heat or power limits, especially on fanless machines. Sleep/closing the lid can interrupt a job; recovery needs validation. |
+| Sustained work | Long self-play runs compete with normal use and may slow under heat or power limits, especially on fanless machines. Sleep/closing the lid can interrupt a job. Recovery is tested at saved round boundaries; in-flight work can be lost. |
 | Numerical differences | CPU, Metal float32 and Modal CUDA bf16/TF32 can choose different search moves. Reusing weights does not reproduce GPU bitwise trajectories or the published benchmark result. |
 | Cost and iteration | The completed Modal replication cost $2.63 for the full app, including evaluation/profiling, and training reached 16,384 games in about 29.6 minutes. That is an observed cloud run, **not** a measured laptop estimate. No complete M2 training study was run for this port. |
 
 The laptop is a good place for playing, debugging rules/UI, inference profiling,
-and small training experiments after a separate MPS trainer port. Modal remains
-the validated path for controlled self-play studies at the existing budgets.
+and local Metal training. Compare the measured throughput before choosing a host
+for controlled self-play studies at the existing budgets.
 Keep the same audit/recovery standards on either machine. See the
 [completed workload profile](control-replication-performance.md) and
 [architecture/data diagnosis](architecture-comparison.md).
@@ -133,6 +132,7 @@ Sources: [backend](../python/blokus_rl/duo_web.py),
   128-simulation turn took **0.08 seconds**. These are UI smoke checks with
   different budgets/models and warm-up, **not** a matched backend benchmark.
 - No optimizer steps, training, paid compute or model/replay uploads were used
-  for this port. Checkpoint files remain read-only to the app.
+  for the inference/UI port. The later Metal training benchmark is documented
+  separately. Checkpoint files remain read-only to the app.
 
 ![Local Duo interface](assets/local-play.jpg)

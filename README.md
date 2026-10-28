@@ -339,6 +339,11 @@ or run `.venv/bin/blokus-rl duo-web`. The local browser app supports mouse
 placement, rotate/flip previews, undo, either seat, and Metal/MPS inference with
 CPU available. See [local play and laptop training limits](docs/local-play.md).
 
+**Train on this Mac's GPU:** run `.venv/bin/python -m blokus_rl.duo_metal_train
+--out runs/my-metal-training`. This continues the preserved CNN with Metal
+float32, fresh AdamW and checkpoint recovery. See [Metal training and the measured
+L40S comparison](docs/metal-training.md) for the benchmark and practical limits.
+
 The second Rust engine is implemented in `src/duo.rs`, with the same
 PyO3 → PyTorch → TorchRL training stack. It supports legal placements, rotations
 and flips, both starting points, forced passes, scoring bonuses, human terminal
