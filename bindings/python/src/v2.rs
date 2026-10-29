@@ -134,7 +134,7 @@ impl PyEngine {
     /// Returns (planes u8, scalars f32, legal u16, counts u32, nets u8) buffers.
     #[allow(clippy::type_complexity)]
     fn prepare(
-        &mut self,
+        &self,
         py: Python<'_>,
         group: usize,
     ) -> PyResult<(
@@ -158,7 +158,7 @@ impl PyEngine {
     }
 
     fn apply(
-        &mut self,
+        &self,
         py: Python<'_>,
         group: usize,
         probabilities: &Bound<'_, PyAny>,
@@ -208,7 +208,7 @@ impl PyEngine {
         self.inner.waiting_external()
     }
 
-    fn external_move(&mut self, slot: usize, action: usize) -> PyResult<()> {
+    fn external_move(&self, slot: usize, action: usize) -> PyResult<()> {
         self.inner
             .external_move(slot, action)
             .map_err(PyValueError::new_err)

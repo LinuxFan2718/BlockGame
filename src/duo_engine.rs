@@ -224,9 +224,12 @@ pub type Solver = fn(&Game, u64, &mut SolverTable, &AtomicU64) -> Option<(i32, u
 /// Per-game solver table size (2^16 entries, 1 MiB), allocated on first use.
 const SLOT_TABLE_BITS: usize = 16;
 
+/// Slots are partitioned into groups (slot i belongs to group i % groups).
+/// Each group has its own lock, so one thread can search a group while another
+/// applies network results to a different group.
 pub struct Engine {
     pub config: EngineConfig,
-    slots: Vec<Slot>,
+    groups: Vec<Mutex<Vec<(usize, Slot)>>>,
     next_game: AtomicU64,
     finished: Mutex<Vec<FinishedGame>>,
     pub counters: Counters,
@@ -236,37 +239,41 @@ pub struct Engine {
 impl Engine {
     pub fn new(config: EngineConfig, solver: Option<Solver>) -> Self {
         assert!(config.groups >= 1 && config.slots >= config.groups);
-        let slots = (0..config.slots)
-            .map(|i| Slot {
-                active: false,
-                index: 0,
-                game: Game::new(),
-                ply: 0,
-                moves: vec![],
-                opening: vec![],
-                opening_plies: 0,
-                seats: [0, 1],
-                trees: [None, None],
-                rng: Rng::new(config.seed.wrapping_mul(1_000_003).wrapping_add(i as u64)),
-                searching: false,
-                full: false,
-                noise_pending: false,
-                target: 0,
-                requested: 0,
-                pending: vec![],
-                pending_agent: 0,
-                records: vec![],
-                waiting_external: false,
-                table: None,
-                planes: vec![],
-                scalars: vec![],
-                legal: vec![],
-                counts: vec![],
-            })
-            .collect();
+        let mut groups: Vec<Vec<(usize, Slot)>> = (0..config.groups).map(|_| vec![]).collect();
+        for i in 0..config.slots {
+            groups[i % config.groups].push((
+                i,
+                Slot {
+                    active: false,
+                    index: 0,
+                    game: Game::new(),
+                    ply: 0,
+                    moves: vec![],
+                    opening: vec![],
+                    opening_plies: 0,
+                    seats: [0, 1],
+                    trees: [None, None],
+                    rng: Rng::new(config.seed.wrapping_mul(1_000_003).wrapping_add(i as u64)),
+                    searching: false,
+                    full: false,
+                    noise_pending: false,
+                    target: 0,
+                    requested: 0,
+                    pending: vec![],
+                    pending_agent: 0,
+                    records: vec![],
+                    waiting_external: false,
+                    table: None,
+                    planes: vec![],
+                    scalars: vec![],
+                    legal: vec![],
+                    counts: vec![],
+                },
+            ));
+        }
         Self {
             config,
-            slots,
+            groups: groups.into_iter().map(Mutex::new).collect(),
             next_game: AtomicU64::new(0),
             finished: Mutex::new(vec![]),
             counters: Counters::default(),
@@ -280,12 +287,18 @@ impl Engine {
             .min(self.config.games)
     }
     pub fn active_games(&self) -> usize {
-        self.slots.iter().filter(|s| s.active).count()
+        self.groups
+            .iter()
+            .map(|g| g.lock().unwrap().iter().filter(|(_, s)| s.active).count())
+            .sum()
     }
     /// All games have been started and finished.
     pub fn done(&self) -> bool {
         self.next_game.load(Ordering::Relaxed) >= self.config.games
-            && self.slots.iter().all(|s| !s.active)
+            && self
+                .groups
+                .iter()
+                .all(|g| g.lock().unwrap().iter().all(|(_, s)| !s.active))
     }
     pub fn drain_finished(&self) -> Vec<FinishedGame> {
         std::mem::take(&mut *self.finished.lock().unwrap())
@@ -293,8 +306,7 @@ impl Engine {
 
     /// Advance one group until each game waits on the network, an external
     /// move, or has nothing left to play. Returns that group's batch.
-    pub fn prepare(&mut self, group: usize) -> Batch {
-        let groups = self.config.groups;
+    pub fn prepare(&self, group: usize) -> Batch {
         let ctx = Context {
             config: &self.config,
             next_game: &self.next_game,
@@ -302,16 +314,10 @@ impl Engine {
             counters: &self.counters,
             solver: self.solver,
         };
-        self.slots
-            .par_iter_mut()
-            .enumerate()
-            .filter(|(i, _)| i % groups == group)
-            .for_each(|(_, slot)| ctx.advance(slot));
+        let mut slots = self.groups[group].lock().unwrap();
+        slots.par_iter_mut().for_each(|(_, slot)| ctx.advance(slot));
         let mut batch = Batch::default();
-        for (i, slot) in self.slots.iter().enumerate() {
-            if i % groups != group || slot.pending.is_empty() {
-                continue;
-            }
+        for (_, slot) in slots.iter().filter(|(_, s)| !s.pending.is_empty()) {
             batch.planes.extend_from_slice(&slot.planes);
             batch.scalars.extend_from_slice(&slot.scalars);
             batch.legal.extend_from_slice(&slot.legal);
@@ -329,14 +335,11 @@ impl Engine {
 
     /// Network results for the batch `prepare(group)` returned: probabilities
     /// over each position's legal moves (concatenated) and values for the mover.
-    pub fn apply(&mut self, group: usize, probabilities: &[f32], values: &[f32]) {
-        let groups = self.config.groups;
+    pub fn apply(&self, group: usize, probabilities: &[f32], values: &[f32]) {
+        let mut slots = self.groups[group].lock().unwrap();
         let mut work = Vec::new();
         let (mut p_offset, mut v_offset) = (0, 0);
-        for (i, slot) in self.slots.iter_mut().enumerate() {
-            if i % groups != group || slot.pending.is_empty() {
-                continue;
-            }
+        for (_, slot) in slots.iter_mut().filter(|(_, s)| !s.pending.is_empty()) {
             let legal: usize = slot.counts.iter().map(|&c| c as usize).sum();
             let n = slot.pending.len();
             work.push((slot, p_offset, v_offset));
@@ -369,16 +372,29 @@ impl Engine {
 
     /// Games waiting for a move from Python: (slot, moves so far).
     pub fn waiting_external(&self) -> Vec<(usize, Vec<u16>)> {
-        self.slots
-            .iter()
-            .enumerate()
-            .filter(|(_, s)| s.active && s.waiting_external)
-            .map(|(i, s)| (i, s.moves.clone()))
-            .collect()
+        let mut out = Vec::new();
+        for group in &self.groups {
+            for (id, s) in group.lock().unwrap().iter() {
+                if s.active && s.waiting_external {
+                    out.push((*id, s.moves.clone()));
+                }
+            }
+        }
+        out.sort_unstable_by_key(|x| x.0);
+        out
     }
 
-    pub fn external_move(&mut self, slot: usize, action: usize) -> Result<(), String> {
-        let s = self.slots.get_mut(slot).ok_or("unknown slot")?;
+    pub fn external_move(&self, slot: usize, action: usize) -> Result<(), String> {
+        let group = self
+            .groups
+            .get(slot % self.config.groups)
+            .ok_or("unknown slot")?;
+        let mut slots = group.lock().unwrap();
+        let s = slots
+            .iter_mut()
+            .find(|(id, _)| *id == slot)
+            .map(|(_, s)| s)
+            .ok_or("unknown slot")?;
         if !s.active || !s.waiting_external {
             return Err("slot is not waiting for an external move".into());
         }

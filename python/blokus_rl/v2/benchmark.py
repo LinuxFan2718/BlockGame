@@ -48,7 +48,9 @@ def measure(evaluator, games, slots, agent, seed=1):
     evaluator.submit = submit
     started = time.perf_counter()
     records = []
-    v2.run(engine, evaluator, on_finished=records.extend)
+    timings = {}
+    runner = v2.run_threaded if getattr(evaluator, "device", None) is not None and evaluator.device.type == "cuda" else v2.run
+    runner(engine, evaluator, on_finished=records.extend, timings=timings)
     seconds = time.perf_counter() - started
     evaluator.submit = original
     counters = engine.counters()
@@ -62,6 +64,7 @@ def measure(evaluator, games, slots, agent, seed=1):
         "mean_batch": round(float(sizes.mean()), 1),
         "median_batch": float(np.median(sizes)),
         "recorded_positions": int(sum(r["records"] for r in records)),
+        "timings": {k: round(v, 2) for k, v in timings.items()},
         **counters,
     }
 

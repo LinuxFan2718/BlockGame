@@ -346,7 +346,8 @@ def train(config, out, *, init=None, imitation=None, resume=False, commit=None):
                 commit()
         return elapsed >= config.max_seconds
 
-    v2.run(engine, evaluator, on_finished=on_finished, replay=replay, poll=poll)
+    runner = v2.run_threaded if device.type == "cuda" else v2.run
+    runner(engine, evaluator, on_finished=on_finished, replay=replay, poll=poll)
     stats["elapsed"] = base_elapsed + time.monotonic() - started
     save_checkpoint(out, learner, replay, stats, config)
     save(out / f"ema-{stats['games']:08d}.pt", learner.ema, {"steps": learner.steps})

@@ -382,3 +382,55 @@ simulations, 100 games per level):
 
 These are a calibration point for an undertrained laptop network, not a v2
 result.
+
+### Phase 6 result: Modal throughput benchmark — success
+
+29 October 2026. Benchmarks and image builds cost about $1.70. Phase 5's
+Pentobi data job was running in parallel. Run out of numeric order because the
+Phase 5 data was still being generated.
+
+**Infrastructure.**
+- `cloud/modal_v2.py` builds one image (Rust 1.91.1, Pentobi 31.0 from
+  source, PyTorch 2.14.1) with CPU data, GPU benchmark, imitation and training
+  functions, all writing to the `blokus-v2` Volume.
+- `cloud/v2_budget.py` refuses any launch whose worst case (hourly rate ×
+  timeout) would take total metered spend past $118. That keeps spending inside
+  the $130 of credits.
+
+**Benchmark rounds** (6×64 network unless noted, bf16, random weights,
+v2 search settings):
+
+| Round | Hardware | Positions/s | Games/s | What limited it |
+|---|---|---:|---:|---|
+| 1 | L40S, 32 cores | 74.5k | 8.9 | Serial Python glue between batches |
+| 2 | L40S, 32 cores | 72k | 8.7 | All phases serial in one thread; 48 rayon threads on a smaller CPU quota |
+| 2 | L4, 16 cores | 42k | 4.8 | GPU |
+| 3 | **L40S, 32 cores** | **130k** | **15.9** | Balanced |
+| 3 | L4, 16 cores | 51k | 5.9 | GPU |
+| 3 | L40S, 32 cores, 8×96 network | 75k | 8.8 | GPU |
+
+**Fixes found by measuring.**
+1. The first image compiled Rust with `target-cpu=native`, and workers on other
+   CPUs died with SIGILL. It now uses the generic target.
+2. Index arrays are built on the GPU, plain copies replace per-batch pinned
+   allocations, and logits are gathered before widening to float32.
+3. Each slot group now has its own lock. Two Python threads drive the two
+   groups, so one group's Rust search and backup overlap the other's GPU work.
+   Waiting on the GPU polls a CUDA event, so the GIL stays free.
+4. Batches are padded to multiples of 256 and cuDNN autotuning is on.
+5. Rayon's threads are capped at the container's cgroup CPU quota.
+
+**Choice for Phase 7:** an L40S with 32 cores ($3.72/hour) and the 6×64 network.
+
+| Hardware | Cost per 1,000 games |
+|---|---:|
+| L40S, 32 cores | $0.065 |
+| L4, 16 cores | $0.086 |
+
+The 8×96 network costs 1.8× as much per game. With about $50 left for
+reinforcement learning, that would buy roughly 380k games instead of about
+700k. Since v1's whole history was about 100k games, data volume matters more
+than capacity at this budget.
+
+For comparison, v1's production pipeline ran 66–79k positions/s at 17% GPU
+busy on the same L40S, with a network 10× smaller.
