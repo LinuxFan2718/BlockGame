@@ -96,3 +96,49 @@ def play(
     games = []
     v2.run(engine, evaluator, on_finished=games.extend, external=external)
     return summarize(games)
+
+
+def head_to_head(model_a, model_b, device, *, pairs, simulations, seed=4040, slots=128):
+    """Network A (agent 0) versus network B (agent 1), same search settings."""
+    book = opening_book(pairs, plies=4, seed=seed)
+    a = v2.play_agent(simulations, net=0)
+    b = v2.play_agent(simulations, net=1)
+    engine = v2.make_engine(
+        [a, b],
+        min(slots, 2 * pairs),
+        2 * pairs,
+        alternate_seats=True,
+        openings=book,
+        shared_tree=False,
+        seed=seed,
+    )
+    evaluator = v2.Evaluator({0: model_a, 1: model_b}, device, score_weight=0.05)
+    games = []
+    v2.run(engine, evaluator, on_finished=games.extend)
+    return summarize(games), games
+
+
+def main():
+    import argparse
+    import json
+
+    import torch
+
+    from .model import load
+
+    parser = argparse.ArgumentParser(description="Head-to-head between two v2 checkpoints")
+    parser.add_argument("a")
+    parser.add_argument("b")
+    parser.add_argument("--pairs", type=int, default=100)
+    parser.add_argument("--simulations", type=int, default=400)
+    parser.add_argument("--device", default=v2.default_device())
+    args = parser.parse_args()
+    torch.set_grad_enabled(False)
+    a, _ = load(args.a, args.device)
+    b, _ = load(args.b, args.device)
+    result, _ = head_to_head(a, b, args.device, pairs=args.pairs, simulations=args.simulations)
+    print(json.dumps({"a": args.a, "b": args.b, **result}))
+
+
+if __name__ == "__main__":
+    main()

@@ -84,6 +84,13 @@ pub fn policy_index(action: usize, player: usize, sym: usize) -> u16 {
     t.symmetric[sym][t.framed[player][action] as usize]
 }
 
+/// For symmetry `sym`: where each cell goes, and where each policy index goes.
+pub fn symmetry_tables(sym: usize) -> (Vec<u16>, Vec<u16>) {
+    let cells = (0..CELLS).map(|c| sym_cell(sym, c) as u16).collect();
+    let policy = tables().symmetric[sym].clone();
+    (cells, policy)
+}
+
 fn mobility(count: usize) -> f32 {
     ((1 + count) as f32).ln() / 7.0
 }

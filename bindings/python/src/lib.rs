@@ -98,6 +98,7 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(v2::duo_v2_encode, module)?)?;
     module.add_function(wrap_pyfunction!(v2::duo_v2_shapes, module)?)?;
     module.add_function(wrap_pyfunction!(v2::duo_solve, module)?)?;
+    module.add_function(wrap_pyfunction!(v2::duo_v2_symmetry, module)?)?;
     Ok(())
 }
 

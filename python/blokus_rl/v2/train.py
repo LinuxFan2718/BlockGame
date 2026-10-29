@@ -47,6 +47,9 @@ class TrainConfig:
     solver_max_moves: int = 20
     solver_root_nodes: int = 100_000
     score_weight: float = 0.05
+    # Self-play games start after 0..N uniformly random plies. This balances
+    # Duo's strong first-move advantage and matches the ladder's random openings.
+    opening_random_plies: int = 0
     # Learning
     replay_capacity: int = 2_000_000
     replay_min: int = 20_000
@@ -223,6 +226,24 @@ def agent_config(config):
     )
 
 
+def random_openings(max_plies, seed, count=50_000):
+    """Opening move lists of 0..max_plies uniformly random legal moves."""
+    if max_plies <= 0:
+        return []
+    from .._native import DuoGame
+
+    rng = np.random.default_rng(seed)
+    openings = []
+    for _ in range(count):
+        game, moves = DuoGame(), []
+        for _ in range(int(rng.integers(0, max_plies + 1))):
+            action = int(rng.choice(game.legal_actions()))
+            game.step(action)
+            moves.append(action)
+        openings.append(moves)
+    return openings
+
+
 def save_checkpoint(out, learner, replay, stats, config):
     out = Path(out)
     atomic_write(out / "replay.bin", bytes(replay.to_bytes()))
@@ -247,7 +268,7 @@ def train(config, out, *, init=None, imitation=None, resume=False, commit=None):
             "max_seconds", "checkpoint_seconds", "log_seconds", "games", "learning_rate",
             "imitation_fraction", "replay_capacity", "window_fraction", "window_min",
             "train_ratio", "temperature_plies", "full_simulations", "fast_simulations",
-            "full_probability", "slots",
+            "full_probability", "slots", "opening_random_plies", "score_weight",
         }
         if changed - adjustable:
             raise ValueError(f"resume config changed: {sorted(changed - adjustable)}")
@@ -285,7 +306,11 @@ def train(config, out, *, init=None, imitation=None, resume=False, commit=None):
 
     agent = agent_config(config)
     engine = v2.make_engine(
-        [agent, agent], config.slots, config.games, seed=config.seed + stats["games"]
+        [agent, agent],
+        config.slots,
+        config.games,
+        seed=config.seed + stats["games"],
+        openings=random_openings(config.opening_random_plies, config.seed + stats["games"]),
     )
     evaluator = v2.Evaluator(
         learner.ema, config.device, precision=config.precision, score_weight=config.score_weight

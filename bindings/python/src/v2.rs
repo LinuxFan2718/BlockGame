@@ -365,3 +365,12 @@ pub fn duo_solve(
 pub fn duo_v2_shapes() -> (usize, usize, usize, usize) {
     (duo_v2::PLANES, duo_v2::SCALARS, duo_v2::POLICY_SIZE, duo_v2::SYMMETRIES)
 }
+
+/// (cell map, policy-index map) for symmetry `sym`; unused policy ids map to 65535.
+#[pyfunction]
+pub fn duo_v2_symmetry(sym: usize) -> PyResult<(Vec<u16>, Vec<u16>)> {
+    if sym >= duo_v2::SYMMETRIES {
+        return Err(PyValueError::new_err("unknown symmetry"));
+    }
+    Ok(duo_v2::symmetry_tables(sym))
+}

@@ -16,7 +16,7 @@ import time
 import numpy as np
 import torch
 
-from .._native import DuoEngine
+from .._native import DuoEngine, duo_v2_symmetry
 from .model import MARGIN_SCALE, PLANES, SIZE
 
 
@@ -31,9 +31,21 @@ def default_device():
 class Evaluator:
     """Batched inference for one or more networks (keyed by engine net id)."""
 
-    def __init__(self, models, device, *, precision="float32", score_weight=0.0, score_scale=20.0):
+    def __init__(
+        self, models, device, *, precision="float32", score_weight=0.0, score_scale=20.0,
+        symmetries=1,
+    ):
         self.models = models if isinstance(models, dict) else {0: models}
         self.device = torch.device(device)
+        # Average the network over this many board symmetries (1, 2 or 4).
+        self.symmetries = symmetries
+        self.cell_maps, self.policy_maps = [], []
+        for sym in range(symmetries):
+            cells, policy = duo_v2_symmetry(sym)
+            policy = np.asarray(policy, np.int64)
+            policy[policy == 65535] = np.flatnonzero(policy == 65535)
+            self.cell_maps.append(torch.tensor(cells, dtype=torch.long, device=self.device))
+            self.policy_maps.append(torch.from_numpy(policy).to(self.device))
         self.precision = precision
         self.score_weight, self.score_scale = score_weight, score_scale
         self.positions = 0
@@ -102,14 +114,13 @@ class Evaluator:
                 for key, model in self.models.items()
                 if (nets == key).any()
             ]
-        if len(groups) > 1:
+        if len(self.models) > 1:
             logits = torch.empty(n, 17837, device=self.device)
             values = torch.empty(n, device=self.device)
         with self.autocast():
             for model, index in groups:
                 xs, ss = (x, scalars) if index is None else (x[index], scalars[index])
-                policy, outcome, margin, _ = model(xs, ss)
-                wdl = torch.softmax(outcome.float(), 1)
+                policy, wdl, margin = self._forward(model, xs, ss)
                 value = wdl[:, 0] - wdl[:, 2]
                 if self.score_weight:
                     value = value + self.score_weight * torch.tanh(
@@ -132,6 +143,23 @@ class Evaluator:
             event = torch.cuda.Event()
             event.record()
         return probabilities, values, event
+
+    def _forward(self, model, x, scalars):
+        """Policy logits, WDL probabilities and margin, averaged over symmetries."""
+        if self.symmetries == 1:
+            policy, outcome, margin, _ = model(x, scalars)
+            return policy, torch.softmax(outcome.float(), 1), margin
+        m = len(x)
+        flat = x.flatten(2)
+        # Every symmetry used here is its own inverse, so one gather moves cells.
+        views = [flat[:, :, cells].view_as(x) for cells in self.cell_maps]
+        policy, outcome, margin, _ = model(torch.cat(views), scalars.repeat(self.symmetries, 1))
+        policy = policy.float()
+        logits = sum(
+            policy[k * m : (k + 1) * m][:, self.policy_maps[k]] for k in range(self.symmetries)
+        ) / self.symmetries
+        wdl = torch.softmax(outcome.float(), 1).view(self.symmetries, m, 3).mean(0)
+        return logits, wdl, margin.float().view(self.symmetries, m).mean(0)
 
     def collect(self, handle):
         probabilities, values, event = handle

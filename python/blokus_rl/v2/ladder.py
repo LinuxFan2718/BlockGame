@@ -160,13 +160,16 @@ def main():
     parser.add_argument("--solver-max-moves", type=int, default=30)
     parser.add_argument("--solver-root-nodes", type=int, default=2_000_000)
     parser.add_argument("--score-weight", type=float, default=0.05)
+    parser.add_argument("--symmetries", type=int, default=1, choices=(1, 2, 4))
     parser.add_argument("--stop-below", type=float, default=None,
                         help="stop climbing once a level scores below this")
     parser.add_argument("--out", type=Path)
     args = parser.parse_args()
     model, data = load(args.checkpoint, args.device)
     torch.set_grad_enabled(False)
-    evaluator = v2.Evaluator(model, args.device, score_weight=args.score_weight)
+    evaluator = v2.Evaluator(
+        model, args.device, score_weight=args.score_weight, symmetries=args.symmetries
+    )
     overrides = dict(
         solver_max_moves=args.solver_max_moves,
         solver_root_nodes=args.solver_root_nodes,

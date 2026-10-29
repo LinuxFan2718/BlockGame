@@ -511,14 +511,15 @@ impl Context<'_> {
             let agent_index = slot.seats[player];
             let agent = &self.config.agents[agent_index];
             if !slot.searching {
-                let legal = slot.game.legal_actions();
-                if legal == [PASS] {
-                    play(slot, PASS);
-                    continue;
-                }
+                // External players answer every turn themselves, including
+                // forced passes, so callers can stop after exactly one move.
                 if agent.external {
                     slot.waiting_external = true;
                     return;
+                }
+                if slot.game.legal_actions() == [PASS] {
+                    play(slot, PASS);
+                    continue;
                 }
                 if self.try_root_solve(slot, agent) {
                     continue;

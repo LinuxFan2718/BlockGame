@@ -479,3 +479,88 @@ Positions were sampled under random symmetries: 15,000 steps of 1,024, about
 Imitation alone, mostly of level-6 games, plus search and the endgame solver
 clears levels 4–6 and is about even with level 7. v1.0's ceiling was between
 levels 3 and 4. This network (`/vol/imitation/v0/init.pt`) seeds Phase 7.
+
+### Phase 7 result: self-play reinforcement learning on Modal — success
+
+29 October 2026. One run, `rl-a` (Modal Volume `blokus-v2`, `/runs/rl-a`), on an
+L40S with 32 cores, started from imitation v0 and resumed in four chunks.
+Fixed throughout:
+- the 6×64 network
+- root endgame solving (gate 20 placements, 100k nodes)
+- 800 full / 128 fast simulations, with 25% of moves getting a full search
+- first 10 plies sampled from the visit counts
+- each recorded position trained on about 4 times, in batches of 512
+- EMA decay 0.995
+
+| Chunk | Hours | Games at end | Changes |
+|---|---:|---:|---|
+| 1 | 2.0 | 154,780 | Self-play from the empty board; Pentobi data 15% of each batch; learning rate 5e-4 |
+| 2 | 3.4 | 440,779 | Games start after 0–4 random plies; Pentobi data 20% (all 32,358 games); learning rate 3e-4 |
+| 3 | 3.0 | 697,588 | Pentobi data 10%; learning rate 2e-4 |
+| 4 | 1.5 | **823,673** | Learning rate 1e-4 |
+
+Totals: 8.5 million recorded positions and 74k gradient steps. Throughput was
+21.5–24.6 games/s and 153–161k positions/s. RL compute cost about $37 of
+credits; Modal metering for the whole v2 effort reached $103.83, against
+$55.56 at the start.
+
+**What went wrong in chunk 1, and the fix.** Losses fell (policy KL
+1.06 → 0.84), but the first player's self-play win rate climbed from 77% to 92%.
+Duo has a large first-move advantage: in Pentobi-vs-Pentobi games without
+random openings, the first player scores 83.5%, 90.5% and 95% at levels 6, 7
+and 8. As self-play got stronger, nearly every second-player position looked
+lost, so the search had little to distinguish and that side's training targets
+degraded.
+
+Against level 7 (same 50 opening pairs), RL improved first-seat play from 82%
+to 86–87% but cut second-seat play from 25% to 17%, for no net gain. A 10×
+stronger score-margin term at play time made it worse (47%).
+
+From chunk 2, self-play games start after 0–4 random plies, matching the
+ladder's openings and Pentobi's data. The first-player rate settled near 65%,
+and second-seat play recovered.
+
+**Progress on fixed openings** (seed 7,000,000; 800 simulations; 100 games per
+level test; head-to-head at 200 simulations over 200 games):
+
+| Network | vs Pentobi 8 | Change vs imitation v0 (paired) | Head-to-head vs v0 |
+|---|---:|---:|---:|
+| imitation v0 | 37.5% | — | — |
+| RL, 234k games | 45.0% | +7.5 [+0.5, +15] | 58.0% [53.75, 62.5] |
+| RL, 315k | 51.0% | +13.5 [+5.5, +22] | — |
+| RL, 441k | 50.0% | +12.5 [+6.5, +19] | 61.0% [56.75, 65.5] |
+| **RL, 824k (release)** | see Phase 8 | — | **65.25% [61.0, 69.75]** |
+
+That is about +110 Elo from reinforcement learning over the imitation network.
+Successive checkpoints scored close to 50% against each other:
+
+| Pair | Score |
+|---|---:|
+| 441k vs 315k | 53% |
+| 569k vs 441k | 50.5% |
+| 655k vs 441k | 50.25% |
+| 824k vs 698k | 51.75% |
+
+So the network largely plateaued after about 450k games at this size.
+
+**Level 7 is noisy, level 8 is not.** Against level 7, every network measured
+50–55% on these openings, from imitation through RL at 234k games. A 100-game
+test resolves only about ±6 points; improvement showed up against level 8 and
+head-to-head.
+
+**Play-time variants that did not help** (imitation v0 against level 7):
+- 3,200 instead of 800 simulations: +2 [−7, +11.5]
+- averaging the network over the 4 board symmetries: −4 [−13, +4.5]
+
+At this network size, the quality of its evaluations, not the amount of search,
+sets the ceiling.
+
+**First look at level 9** (441k network, 20 games): 45% [35, 50], winning 85%
+from the first seat and 5% from the second. Pentobi took about 28 s per move.
+
+**New tools added in this phase:**
+- `blokus_rl.v2.arena` for network head-to-head
+- `blokus_rl.v2.compare` for paired comparisons on the same openings
+- `--opening-random-plies` in training
+- `--symmetries` for ensemble evaluation
+- schedule changes allowed on resume
