@@ -196,7 +196,7 @@ def benchmark(configs: list):
     return results
 
 
-@app.function(image=image, gpu="L4", cpu=16, memory=32768, timeout=6 * 3600, volumes={"/vol": volume})
+@app.function(image=image, gpu="L40S", cpu=32, memory=32768, timeout=6 * 3600, volumes={"/vol": volume})
 def train_remote(run: str, args: list, init: str = "", imitation: str = "", resume: bool = False):
     """Self-play training into /vol/runs/<run>; resumable. `args` are train.py flags."""
     limit_threads()
@@ -286,6 +286,12 @@ def bench(configs: str, gpu: str = "L4", cpu: int = 16):
 
 
 @app.local_entrypoint()
-def imitate(name: str, inputs: str, args: str = ""):
+def imitate(name: str, inputs: str, args: str = "", gpu: str = "L40S"):
     """Imitation training; inputs are comma-separated Volume paths."""
-    print(imitate_remote.remote(name, inputs.split(","), args.split()))
+    print(imitate_remote.with_options(gpu=gpu).remote(name, inputs.split(","), args.split()))
+
+
+@app.local_entrypoint()
+def train(run: str, args: str = "", init: str = "", imitation: str = "", resume: bool = False):
+    """Self-play RL chunk on L40S + 32 cores (see cloud/v2_budget.py first)."""
+    print(json.dumps(train_remote.remote(run, args.split(), init, imitation, resume)))

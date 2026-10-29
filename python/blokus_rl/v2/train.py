@@ -242,11 +242,22 @@ def train(config, out, *, init=None, imitation=None, resume=False, commit=None):
         state = torch.load(out / "state.pt", map_location="cpu", weights_only=False)
         saved = TrainConfig(**state["config"])
         changed = {k for k, v in asdict(config).items() if getattr(saved, k) != v}
-        if changed - {"max_seconds", "checkpoint_seconds", "log_seconds", "games"}:
-            raise ValueError(f"resume config changed: {sorted(changed)}")
+        # Schedules may change between resumed chunks; the game itself may not.
+        adjustable = {
+            "max_seconds", "checkpoint_seconds", "log_seconds", "games", "learning_rate",
+            "imitation_fraction", "replay_capacity", "window_fraction", "window_min",
+            "train_ratio", "temperature_plies", "full_simulations", "fast_simulations",
+            "full_probability", "slots",
+        }
+        if changed - adjustable:
+            raise ValueError(f"resume config changed: {sorted(changed - adjustable)}")
+        if changed:
+            print(json.dumps({"resume_changes": sorted(changed)}), flush=True)
         model = build({"blocks": config.blocks, "channels": config.channels, "context": 64})
         learner = Learner(config, model)
         learner.restore(state["learner"])
+        for group in learner.optimizer.param_groups:
+            group["lr"] = config.learning_rate
         replay = DuoReplay.from_bytes((out / "replay.bin").read_bytes())
         replay.capacity = config.replay_capacity
         stats = state["stats"]

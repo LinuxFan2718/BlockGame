@@ -434,3 +434,48 @@ than capacity at this budget.
 
 For comparison, v1's production pipeline ran 66–79k positions/s at 17% GPU
 busy on the same L40S, with a network 10× smaller.
+
+### Phase 5 result: imitation of Pentobi — success
+
+29 October 2026. Modal spend: level 7/8 data about $5 (job still running at the
+time of writing) and imitation training about $0.40.
+
+**Data** (`python/blokus_rl/v2/pentobi_data.py`). Pentobi plays both colors,
+one single-threaded process per worker. The first 0–3 plies are random and every
+game gets a fresh seed, for variety. Every game's final score is checked against
+Pentobi's.
+- **Level 6 on the Mac (free):** 21,769 games in 90 minutes with 7 workers.
+- **Levels 7 and 8 on a Modal CPU container** (32 cores, 60 workers, $1.64/hour,
+  3 hours): about 31 s and 118 s per game per worker. It had produced 4,408
+  games when imitation v0 started and was still running.
+
+Measured on one M2 core, level 7 takes about 22 s per game and level 8 about
+67 s. Level 9 was not used: its cost per game is far higher.
+
+**Training** (`python/blokus_rl/v2/imitate.py`, L40S, 7 minutes). Targets:
+- Pentobi's chosen move (one-hot)
+- the game's win/draw/loss and score margin
+- the final owner of every cell
+
+Positions were sampled under random symmetries: 15,000 steps of 1,024, about
+30 passes over 508k positions from 16,324 games, with 300 games held out.
+- **Held-out move match: 38.4%.** The network's top choice equals Pentobi's
+  move on 38% of positions; Pentobi itself is stochastic.
+- **Held-out value loss** was best at step 8,000 (0.522) and then drifted
+  (0.55 at the end) while training loss kept falling. Positions from the same
+  game are correlated, so the value head overfits first. `best.pt` keeps the
+  best-value checkpoint.
+
+**Ladder** (final imitation weights, 800 simulations, endgame solver on,
+100 games per level):
+
+| Pentobi level | Score | Interval | v1.0 for comparison |
+|---|---:|---:|---|
+| 4 | **89.0%** | [83.0, 94.5] | 33.75–44% at 2,048 sims |
+| 5 | **80.5%** | [73.5, 87.0] | not reached |
+| 6 | **69.5%** | [63.0, 76.0] | — |
+| 7 | 53.5% | [46.0, 61.0] | — |
+
+Imitation alone, mostly of level-6 games, plus search and the endgame solver
+clears levels 4–6 and is about even with level 7. v1.0's ceiling was between
+levels 3 and 4. This network (`/vol/imitation/v0/init.pt`) seeds Phase 7.
