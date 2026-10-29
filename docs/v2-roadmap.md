@@ -328,3 +328,57 @@ v1 needed several GPU training studies to reach 62.5% against level 1 and
 
 A bug found along the way: elapsed time was double-counted at each checkpoint,
 which made runs stop early. It is fixed.
+
+### Phase 4 result: parallel Pentobi ladder — success
+
+28–29 October 2026. No Modal spend.
+
+**What was built.** `python/blokus_rl/v2/ladder.py` plays a v2 checkpoint
+against Pentobi 31.0 (`--nobook --noresign`, one thread) at chosen levels:
+- Many games run at once in the Rust engine, each with its own Pentobi process.
+- Pentobi moves are generated in a thread pool while the engine keeps searching
+  the other games.
+- Openings are four random plies, each played from both seats; draws count half.
+- The intervals are paired bootstrap intervals over openings, reusing v1's
+  `paired_interval`.
+- Root endgame solving is on by default (gate 30, 2M nodes).
+
+Command:
+`.venv/bin/python -m blokus_rl.v2.ladder CHECKPOINT --levels 3 4 5 --pairs 100 --simulations 800`.
+
+**Correctness checks, on every game:**
+- every Pentobi move must be legal in our engine
+- seats alternate per opening
+- after the run, every game is replayed into a fresh Pentobi process, and
+  Pentobi's `final_score` must equal ours
+
+I changed the planned success test. The plan called for reproducing v1's
+level-3/4 results in the new harness, but v1's network cannot run in the v2
+engine: the inputs and search differ. The per-game score agreement with Pentobi
+is a stronger check of the harness. Re-running v1 would only re-measure an
+already published result.
+
+**Speed.** On the Mac, 100 games take 15 s at levels 1–2 (128 sims), and about
+80 s at levels 3–5 (400 sims, while sharing the CPU with Pentobi data
+generation). v1's harness took 341–404 s for 200 games on Modal.
+
+Measured Pentobi time per game (both sides, one M2 core):
+
+| Level | 3 | 4 | 5 | 6 | 7 | 8 |
+|---|---:|---:|---:|---:|---:|---:|
+| Seconds per game | 0.05 | 0.07 | 0.16 | 1.2 | 22 | 67 |
+
+So levels 1–7 can be evaluated cheaply on the Mac; level 8 needs about 2 s per
+Pentobi move.
+
+**First ladder numbers** (the 15-minute Phase 3 smoke network, 4×32, 400
+simulations, 100 games per level):
+
+| Level | Score | Interval |
+|---|---:|---:|
+| 3 | 45.0% | [36.0, 54.0] |
+| 4 | 22.5% | [16.0, 29.0] |
+| 5 | 18.0% | [11.0, 25.5] |
+
+These are a calibration point for an undertrained laptop network, not a v2
+result.
