@@ -79,12 +79,18 @@ def main():
     parser.add_argument("--full", type=int, default=1024)
     parser.add_argument("--full-probability", type=float, default=0.25)
     parser.add_argument("--leaf-batch", type=int, default=4)
+    parser.add_argument("--solver-max-moves", type=int, default=0)
+    parser.add_argument("--solver-root-nodes", type=int, default=0)
+    parser.add_argument("--solver-leaf-nodes", type=int, default=0)
     args = parser.parse_args()
     agent = v2.self_play_agent(
         fast_simulations=args.fast,
         full_simulations=args.full,
         full_probability=args.full_probability,
         leaf_batch=args.leaf_batch,
+        solver_max_moves=args.solver_max_moves,
+        solver_root_nodes=args.solver_root_nodes,
+        solver_leaf_nodes=args.solver_leaf_nodes,
     )
     if args.network == "uniform":
         evaluator = UniformEvaluator()

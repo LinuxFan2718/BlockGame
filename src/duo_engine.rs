@@ -10,6 +10,7 @@
 //! replaced by a new one.
 use crate::duo::{CELLS, Game, PASS};
 use crate::duo_mcts::{Leaf, SearchParams, Selection, Tree};
+use crate::duo_solver::SolverTable;
 use crate::duo_v2::{self, PLANES, SCALARS};
 use rayon::prelude::*;
 use std::sync::Mutex;
@@ -191,6 +192,7 @@ struct Slot {
     pending_agent: usize,
     records: Vec<PositionRecord>,
     waiting_external: bool,
+    table: Option<Box<SolverTable>>,
     // Encoded pending leaves.
     planes: Vec<u8>,
     scalars: Vec<f32>,
@@ -217,7 +219,10 @@ impl Batch {
     }
 }
 
-pub type Solver = fn(&Game, u64, &AtomicU64) -> Option<(i32, usize)>;
+pub type Solver = fn(&Game, u64, &mut SolverTable, &AtomicU64) -> Option<(i32, usize)>;
+
+/// Per-game solver table size (2^16 entries, 1 MiB), allocated on first use.
+const SLOT_TABLE_BITS: usize = 16;
 
 pub struct Engine {
     pub config: EngineConfig,
@@ -252,6 +257,7 @@ impl Engine {
                 pending_agent: 0,
                 records: vec![],
                 waiting_external: false,
+                table: None,
                 planes: vec![],
                 scalars: vec![],
                 legal: vec![],
@@ -464,6 +470,7 @@ impl Context<'_> {
         self.finished.lock().unwrap().push(game);
         slot.active = false;
         slot.trees = [None, None];
+        slot.table = None;
     }
 
     fn advance(&self, slot: &mut Slot) {
@@ -511,12 +518,15 @@ impl Context<'_> {
             let tree = slot.trees[tree_index].as_mut().unwrap();
             let solver = self.solver.filter(|_| agent.solver_leaf_nodes > 0);
             let counters = self.counters;
+            let table = &mut slot.table;
             let mut leaf_solver = |game: &Game| {
                 let s = solver?;
                 if !small_enough(game, agent.solver_max_moves) {
                     return None;
                 }
-                let result = s(game, agent.solver_leaf_nodes, &counters.solver_nodes)?;
+                let table =
+                    table.get_or_insert_with(|| Box::new(SolverTable::new(SLOT_TABLE_BITS)));
+                let result = s(game, agent.solver_leaf_nodes, table, &counters.solver_nodes)?;
                 counters.solver_leaf_hits.fetch_add(1, Ordering::Relaxed);
                 Some(result.0)
             };
@@ -558,9 +568,13 @@ impl Context<'_> {
         if agent.solver_root_nodes == 0 || !small_enough(&slot.game, agent.solver_max_moves) {
             return false;
         }
+        let table = slot
+            .table
+            .get_or_insert_with(|| Box::new(SolverTable::new(SLOT_TABLE_BITS)));
         let Some((margin, action)) = solver(
             &slot.game,
             agent.solver_root_nodes,
+            table,
             &self.counters.solver_nodes,
         ) else {
             return false;
@@ -740,6 +754,44 @@ mod tests {
                 let visits: u32 = r.visits.iter().map(|v| u32::from(v.1)).sum();
                 assert!(visits >= 32);
             }
+        }
+    }
+
+    #[test]
+    fn solver_moves_are_recorded_and_games_stay_valid() {
+        let agent = AgentConfig {
+            full_simulations: 16,
+            fast_simulations: 4,
+            solver_max_moves: 20,
+            solver_root_nodes: 100_000,
+            solver_leaf_nodes: 2_000,
+            ..AgentConfig::default()
+        };
+        let config = EngineConfig {
+            agents: [agent.clone(), agent],
+            slots: 6,
+            groups: 2,
+            games: 6,
+            alternate_seats: false,
+            openings: vec![],
+            shared_tree: true,
+            seed: 13,
+        };
+        let mut engine = Engine::new(config, Some(crate::duo_solver::solve));
+        let mut finished = Vec::new();
+        while !engine.done() {
+            uniform_round(&mut engine, 0);
+            uniform_round(&mut engine, 1);
+            finished.extend(engine.drain_finished());
+        }
+        assert!(engine.counters.solver_moves.load(Ordering::Relaxed) > 0);
+        for g in &finished {
+            let mut game = Game::new();
+            for &m in &g.moves {
+                game.step(usize::from(m)).unwrap();
+            }
+            assert_eq!(game.scores(), g.scores);
+            assert!(g.records.iter().any(|r| r.solved));
         }
     }
 

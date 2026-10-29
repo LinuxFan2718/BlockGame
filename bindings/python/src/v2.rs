@@ -125,7 +125,7 @@ impl PyEngine {
             shared_tree,
             seed,
         };
-        let solver = solver.then_some(duo_solver::solve_with_budget as tic_tac_toe::duo_engine::Solver);
+        let solver = solver.then_some(duo_solver::solve as tic_tac_toe::duo_engine::Solver);
         Ok(Self {
             inner: Engine::new(config, solver),
         })

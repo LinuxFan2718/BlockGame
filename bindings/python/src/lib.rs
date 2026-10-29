@@ -157,6 +157,13 @@ impl PyDuoGame {
     fn legal_actions(&self) -> Vec<usize> {
         self.inner.legal_actions()
     }
+    /// Placements `player` could make if it were to move now (`[PASS]` if none).
+    fn legal_actions_for(&self, player: usize) -> PyResult<Vec<usize>> {
+        if player > 1 {
+            return Err(PyValueError::new_err("player must be 0 or 1"));
+        }
+        Ok(self.inner.legal_actions_for(player))
+    }
     /// Candidate row: piece id followed by five board cells (196 pads unused cells).
     fn candidates(&self) -> (Vec<usize>, Vec<Vec<usize>>) {
         let actions = self.inner.legal_actions();

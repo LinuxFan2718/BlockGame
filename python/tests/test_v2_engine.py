@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 
-from blokus_rl._native import DuoGame, DuoReplay, duo_v2_encode
+from blokus_rl._native import DuoGame, DuoReplay, duo_solve, duo_v2_encode
 from blokus_rl.v2 import engine as v2
 from blokus_rl.v2.benchmark import UniformEvaluator
 from blokus_rl.v2.model import DuoNetV2, POLICY_SIZE
@@ -72,3 +72,37 @@ def test_external_seat_plays_against_search():
     finished = []
     v2.run(engine, UniformEvaluator(), on_finished=finished.extend, external=external)
     assert sorted(tuple(g["seats"]) for g in finished) == [(0, 1), (0, 1), (1, 0), (1, 0)]
+
+
+def minimax(game):
+    """Exact final margin for the player to move, by plain enumeration."""
+    mover, best = game.current_player, None
+    for action in game.legal_actions():
+        child = game.copy()
+        child.step(action)
+        if child.terminated:
+            value = child.scores[mover] - child.scores[1 - mover]
+        else:
+            value = -minimax(child)
+        best = value if best is None else max(best, value)
+    return best
+
+
+def test_solver_matches_python_minimax_late_in_games():
+    rng = np.random.default_rng(5)
+    checked = 0
+    for _ in range(6):
+        game, moves = DuoGame(), []
+        while not game.terminated:
+            action = int(rng.choice(game.legal_actions()))
+            game.step(action)
+            moves.append(action)
+        for back in (2, 3, 4):
+            position = DuoGame()
+            for m in moves[:-back]:
+                position.step(m)
+            (margin, action), _ = duo_solve(moves[:-back], 1_000_000)
+            assert margin == minimax(position)
+            assert action in position.legal_actions()
+            checked += 1
+    assert checked == 18

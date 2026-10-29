@@ -214,3 +214,63 @@ Two Metal-specific slowdowns were found and fixed:
 **Conclusion.** The CPU side is no longer the bottleneck: the Mac alone searches
 3× faster than v1's whole L40S pipeline. On a CUDA GPU the network becomes the
 limit, which is the right problem to have. Phase 6 measures this on Modal.
+
+### Phase 2 result: exact endgame solver — success
+
+28 October 2026. No Modal spend.
+
+**What was built.** `src/duo_solver.rs` is a negamax alpha-beta search over the
+exact final score margin (mover minus opponent) to the end of the game:
+- Moves are ordered by the transposition-table move first, then larger pieces.
+- The transposition table is Zobrist-hashed and keeps proven bounds. Each game
+  owns a 1 MiB table, so later solves in the same game reuse earlier proofs.
+  Searches that run out of budget store nothing.
+- Maximizing the margin also maximizes the result: if a win exists, the best
+  margin is positive.
+
+The engine uses it in two ways:
+- **Root solve:** when the mover's and the opponent's legal placements together
+  are within a gate, the solver picks the move outright and the position is
+  recorded with the proven move as its target.
+- **Leaf solve:** solved search leaves back up exact values instead of calling
+  the network.
+
+Python can call it directly through `duo_solve`.
+
+**Correctness.**
+- It matches plain minimax (no pruning, no table) on 60 random late positions,
+  and the returned move achieves the value.
+- A Python test checks 18 more positions against an independent Python minimax.
+- An engine test confirms solved moves are recorded and every game replays to
+  the same score.
+
+**Reach** (game-like positions, 2M-node budget):
+
+| Legal placements, both sides | Proved | Median nodes | Slowest |
+|---|---:|---:|---:|
+| < 10 | 58/58 | 2 | 2 ms |
+| 10–19 | 40/40 | 118 | 7 ms |
+| 20–39 | 42/42 | 19k | 1.3 s |
+| 40–59 | 13/19 | 86k | 1.2 s |
+
+In practice that covers roughly the last 10–15 plies of a game.
+
+**Cost in self-play** (512 games, stand-in network, 8 cores):
+
+| Setting | Games/s | Moves solved |
+|---|---:|---:|
+| Solver off | 28.5 | 0 |
+| Root gate 20 placements, 100k nodes | 24.4 (−14%) | 17% |
+| Root gate 30, 300k nodes | 16.8 (−41%) | 21% |
+| Root 30 + leaves (20k nodes) | 1.1 (−96%) | — |
+
+Leaf solving at every eligible search leaf is far too expensive. Long solves
+also stall a whole batch group, because `prepare` waits for its slowest game.
+**Self-play uses root solving only (gate 20, 100k nodes).** Evaluation and the
+app can afford larger budgets.
+
+**Strength check.** Same search (uniform priors, 256 simulations), with versus
+without the root solver (gate 24, 300k nodes): over 400 games (200 openings,
+colors swapped) the solver side scored **61.4%** (paired 95% interval
+58.5–64.3%). Against a strong network the gain will be smaller, but the solver
+never makes an endgame mistake.
