@@ -34,6 +34,12 @@ with `--no-browser` when a browser should not be opened automatically.
 
 ## Mouse and keyboard controls
 
+On desktop, the board sizes itself to the available window height while the
+labels and controls stay large. Use **Command-0** to return browser zoom to 100%.
+The tall introduction is removed from the play screen, and New game sits in the
+header. In short windows the piece tray scrolls independently; the board and
+action buttons stay visible. Narrow screens keep a vertically scrolling layout.
+
 Click a piece in your tray, point at the board to see a preview, and click to
 place it. The pointed square anchors the **top-left of the shape's bounding box**;
 it need not be a filled square of the piece. Rotate with **R** or the Rotate
@@ -135,4 +141,4 @@ Sources: [backend](../python/blokus_rl/duo_web.py),
   for the inference/UI port. The later Metal training benchmark is documented
   separately. Checkpoint files remain read-only to the app.
 
-![Local Duo interface](assets/local-play.jpg)
+![Local Duo interface with the whole board visible](assets/local-play-fit.png)
