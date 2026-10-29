@@ -119,7 +119,8 @@ def run(engine, evaluator, *, on_finished=None, external=None, replay=None, poll
     """Play until the engine has finished all games.
 
     on_finished(list_of_game_dicts) is called as games end; external(engine)
-    supplies moves for external seats; poll() runs once per iteration.
+    supplies moves for external seats; poll() runs once per iteration and may
+    return True to stop early.
     """
     handles = {0: evaluator.submit(engine.prepare(0)), 1: None}
     current = 0
@@ -134,8 +135,8 @@ def run(engine, evaluator, *, on_finished=None, external=None, replay=None, poll
             on_finished(finished)
         if external is not None:
             external(engine)
-        if poll is not None:
-            poll()
+        if poll is not None and poll():
+            return  # Early stop requested; unfinished games are discarded.
         current = following
         if engine.done() and handles[0] is None and handles[1] is None:
             break

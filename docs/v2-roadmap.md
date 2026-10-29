@@ -274,3 +274,57 @@ without the root solver (gate 24, 300k nodes): over 400 games (200 openings,
 colors swapped) the solver side scored **61.4%** (paired 95% interval
 58.5–64.3%). Against a strong network the gain will be smaller, but the solver
 never makes an endgame mistake.
+
+### Phase 3 result: v2 network and training loop — success
+
+28 October 2026. No Modal spend.
+
+**What was built.** `python/blokus_rl/v2/train.py` runs self-play and learning
+in one process:
+- The engine plays continuously with the EMA network. Between engine batches
+  the learner takes gradient steps, so each recorded position is sampled about
+  `train_ratio` (4) times.
+- Batches come from the newest half of the replay (at least 100k positions),
+  each position under a random board symmetry.
+- **Losses:** policy cross-entropy over legal moves, win/draw/loss
+  cross-entropy, score margin (smooth L1 on margin/20, weight 0.5) and per-cell
+  final ownership (weight 0.5).
+- **Optimizer:** AdamW with gradient clipping. An exponential moving average of
+  the weights (decay 0.995) plays self-play and is what gets saved.
+- **Search value** = P(win) − P(loss) + 0.05·tanh(predicted margin / 20).
+- **Checkpoints** hold weights, optimizer and the compact replay (5.5 MB for
+  60k positions; 0.08 s to save). Runs resume with `--resume`, and a Modal
+  Volume can be committed after each checkpoint.
+
+`python/blokus_rl/v2/arena.py` plays a network against any outside mover
+(baselines, Pentobi), with each random opening played from both seats.
+
+**Tests.** Two new Python tests:
+- a small network overfits a fixed batch (policy, value and ownership losses
+  all fall)
+- checkpoint and replay round-trip exactly
+
+**Local smoke run.** M2 Metal, 15 minutes, a small 4×32 network from random
+weights, reduced search (128 full / 32 fast):
+- 4,919 games at 8–9 games/s and 12.5k positions/s, 852 gradient steps
+- Policy KL fell from 1.40 to 1.07, value loss from 0.71 to 0.51, ownership
+  loss from 0.74 to 0.35
+- About 17% of moves were played by the exact solver
+
+| Opponent (64 sims, solver off, 100 games) | Untrained | After 15 min |
+|---|---:|---:|
+| Random mover | 68.5% | **100%** (100–0) |
+| Largest-piece baseline | 22.0% | **100%** (100–0) |
+
+For context, v1's trained raw policy scored 80% against largest-piece.
+
+A first Pentobi check of the same smoke network at 128 simulations (endgame
+solver on):
+- **62.5%** against level 1 [55.5, 69.5]
+- **54.5%** against level 2 [46.0, 63.0]
+
+v1 needed several GPU training studies to reach 62.5% against level 1 and
+42.0% against level 2 at 128 simulations.
+
+A bug found along the way: elapsed time was double-counted at each checkpoint,
+which made runs stop early. It is fixed.
