@@ -201,7 +201,7 @@ select { min-height: 52px; }
   .hint-toggle { font-size: 18px; line-height: 1.4; }
   .hint-toggle input { margin-top: 3px; }
   .corner-note { display: none; }
-  .opponent-pieces { margin-top: 10px; padding-top: 8px; font-size: 18px; max-height: 120px; overflow-y: auto; }
+  .opponent-pieces { margin-top: 10px; padding-top: 8px; font-size: 18px; max-height: 160px; overflow-y: auto; }
   .page-footer { display: none; }
 }
 @media (max-width: 799px) {
