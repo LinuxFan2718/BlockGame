@@ -27,20 +27,22 @@ ROOT = Path(__file__).resolve().parents[2]
 ASSETS = Path(__file__).with_name("web")
 SIMULATIONS = (0, 128, 512, 2048)
 MODEL_PATHS = {
+    "v2": ("Cornerstone 2.0", "runs/v2-release/v2.pt"),
+    "v2-imitation": ("Cornerstone 2.0 · imitation stage", "runs/v2-imitation/v0/imitation.pt"),
     "replicated": (
-        "Control · seed 1071",
+        "Cornerstone 1.0 · seed 1071",
         "runs/control-replication-final-20261028T171624Z/duo-control-replication-1071/frozen-control1024.pt",
     ),
     "control": (
-        "Control · seed 1070",
+        "Cornerstone 1.0 · seed 1070",
         "runs/integrated-study-final-20261028T152508Z/duo-integrated-teacher-1070/frozen-control1024.pt",
     ),
     "teacher": (
-        "Teacher · seed 1070",
+        "Cornerstone 1.0 · teacher 1070",
         "runs/integrated-study-final-20261028T152508Z/duo-integrated-teacher-1070/frozen-teacher2048.pt",
     ),
     "parent": (
-        "Original parent",
+        "Cornerstone 1.0 · parent",
         "runs/duo-level3-final-20261027T0049/duo-strong-search2048-level3-2603000/search-2048/model.pt",
     ),
 }
@@ -61,8 +63,18 @@ def model_catalog(checkpoint=None):
     return {key: (label, ROOT / path) for key, (label, path) in MODEL_PATHS.items() if (ROOT / path).is_file()}
 
 
+def load_any(path):
+    """v2 checkpoints (format "duo-v2") or v1 policies."""
+    data = torch.load(path, map_location="cpu", weights_only=False)
+    if isinstance(data, dict) and data.get("format") == "duo-v2":
+        from .v2.model import load as load_v2
+
+        return load_v2(path)[0]
+    return load_duo(path)
+
+
 class LocalGame:
-    def __init__(self, catalog, device="auto", *, policy_loader=load_duo):
+    def __init__(self, catalog, device="auto", *, policy_loader=load_any):
         if not catalog:
             raise ValueError("No local checkpoint found. Supply a checkpoint to duo-web.")
         self.catalog, self.policy_loader = catalog, policy_loader
@@ -177,6 +189,9 @@ class LocalGame:
             if model_id not in self.models:
                 self.models[model_id] = self.policy_loader(self.catalog[model_key][1]).to(device).eval()
             model = self.models[model_id]
+            if getattr(model, "config", None) and hasattr(model, "trunk"):
+                self._v2_move(model, game, game_id, version, cancel, device, simulations, start)
+                return
 
             def evaluate(records):
                 if cancel.is_set():
@@ -206,6 +221,30 @@ class LocalGame:
                 if self.id == game_id and self.version == version and not cancel.is_set():
                     self.status, self.error = "error", f"Bot inference failed: {exc}"
                     self.thinking_since = None
+
+    def _v2_move(self, model, game, game_id, version, cancel, device, simulations, start):
+        """v2 agent: Rust search with exact endgame solving."""
+        from .v2 import engine as v2
+        from .v2.play import Cancelled, choose_move
+
+        evaluator = v2.Evaluator(model, device, score_weight=0.05)
+        with self.lock:
+            if self.id != game_id or self.version != version:
+                return
+            moves = [row["action"] for row in self.actions]
+        try:
+            with torch.inference_mode():
+                action = choose_move(evaluator, moves, simulations, cancel=cancel)
+        except Cancelled:
+            return
+        elapsed = time.monotonic() - start
+        with self.lock:
+            if cancel.is_set() or self.id != game_id or self.version != version:
+                return
+            self._apply(action)
+            self.last_search = {"seconds": elapsed, "simulations": simulations}
+            self.thinking_since = None
+            self._advance()
 
     def state(self):
         with self.lock:

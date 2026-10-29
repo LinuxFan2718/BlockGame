@@ -1,8 +1,55 @@
-# Tic-tac-toe: a first environment for reinforcement learning
+# Cornerstone: learning to play Blokus Duo
+
+## Cornerstone 2.0: a Blokus Duo agent (current)
+
+**Cornerstone** is this project's Blokus Duo agent. Version 1.0 was the CNN
+described further down; **Cornerstone 2.0** is the current release.
+
+**Play it:** double-click [Play Blokus.command](Play%20Blokus.command). The app
+opens with Cornerstone 2.0. It is a 6-block residual network searching in the
+Rust engine, and an exact solver plays its endgames perfectly. About 1 second
+per move at 2,048 simulations on an M2.
+
+How it was built and what it achieves:
+- [Architecture](docs/cornerstone-2.0-architecture.md): the network, search,
+  solver and training recipe, with credit to AlphaGo Zero, KataGo, AlphaBlokus
+  and Pentobi.
+- [Roadmap and results](docs/v2-roadmap.md): eight phases, each committed with
+  its measured outcome, including the failures.
+
+**Final results** (release network, 800 simulations per move, 100 fresh
+openings of 4 random plies, each played from both seats = 200 games per level):
+
+| Pentobi 31.0 level | Cornerstone 1.0 | Cornerstone 2.0 | First seat | Second seat |
+|---|---|---:|---:|---:|
+| 6 | — | **76.0%** [71.25, 80.75] | 91.0% | 61.0% |
+| 7 | — | **58.25%** [54.0, 62.5] | 85.5% | 31.0% |
+| 8 | — | **52.25%** [49.0, 55.5] | 81.5% | 23.0% |
+
+Cornerstone 1.0 topped out between levels 3 and 4: about 58% against level 3
+and 34–44% against level 4 at 2,048 simulations. Cornerstone 2.0 clears levels
+4–7 and is even with level 8. A 20-game sample against level 9 (an earlier RL
+network) scored 45%.
+
+```sh
+# Pentobi ladder for any v2 checkpoint (Pentobi built in .local/pentobi-build)
+.venv/bin/python -m blokus_rl.v2.ladder runs/v2-release/v2.pt --levels 6 7 8 --pairs 100 --simulations 800
+# Head-to-head between two v2 checkpoints
+.venv/bin/python -m blokus_rl.v2.arena A.pt B.pt --pairs 100 --simulations 200
+# Self-play training locally on Metal (cloud runs: cloud/modal_v2.py)
+.venv/bin/python -m blokus_rl.v2.train --out runs/my-run --init runs/v2-release/v2.pt --blocks 6 --channels 64
+```
+
+The trained weights live in the ignored `runs/` directory
+(`runs/v2-release/v2.pt`) and in the Modal Volume `blokus-v2`. The rest of this
+README documents how the project got here, starting with tic-tac-toe.
+
+## Tic-tac-toe: a first environment for reinforcement learning
 
 This project provides a Rust game engine, human and random players, and a
-PyTorch neural agent trained with TorchRL's PPO loss. The Rust engine has no
-external dependencies. Python training is an optional, separate package.
+PyTorch neural agent trained with TorchRL's PPO loss. The Rust crate's only
+dependency is rayon, used by the parallel Blokus Duo self-play engine. Python
+training is an optional, separate package.
 
 For the neural-network lesson, training, saved-model evaluation, and playing
 against the trained bot, start with [the PyTorch and PPO walkthrough](docs/training.md).

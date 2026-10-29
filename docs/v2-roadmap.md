@@ -1,4 +1,9 @@
-# Blokus Duo agent: v1.0 → v2.0 roadmap
+# Cornerstone 1.0 → 2.0 roadmap
+
+**Cornerstone** is this project's Blokus Duo agent. The name was chosen on 29
+October 2026 and applies to every release: v1.0 (`7a8ed0c`) is Cornerstone 1.0,
+and the agent built here is Cornerstone 2.0. Its architecture is described in
+[cornerstone-2.0-architecture.md](cornerstone-2.0-architecture.md).
 
 Started 28 October 2026 from v1.0 (`7a8ed0c`). Goal: the strongest Blokus Duo
 agent we can train with the remaining Modal credits, climbing the Pentobi
@@ -129,8 +134,45 @@ results, honest limitations and next steps go here.
 
 ## Beyond the budget
 
-This section is filled in as the phases reveal which large-compute strategies
-look most promising.
+These strategies would likely make the agent much stronger, but each needs
+hundreds to thousands of dollars of compute. Per the instructions they are
+described here, not implemented. Costs use current Modal rates (L40S $1.95/h,
+H100 $3.95/h, CPU $0.047/core-hour) and this project's measured throughput
+(L40S + 32 cores: about 22 self-play games per second with the 6×64 network).
+
+1. **A KataGo-scale run (~$1,500–3,000).** Grow the network as data grows: 6×64
+   for the first million games, then 10×128, then 15×192. Train on 20–50 million
+   self-play games: about 250–600 L40S-hours at the measured rate, and more as
+   the network grows. KataGo's own history shows its biggest gains came from
+   longer runs with progressively larger networks. Our engine and replay format
+   already support this; the main additions would be a growing-network schedule
+   and distributed self-play (several GPU workers writing to one replay).
+2. **Distributed self-play with a central learner (~$1,000 for a week).**
+   Eight to sixteen L40S self-play workers stream games to one learner, which
+   publishes new weights every few minutes. This is the AlphaZero/KataGo
+   architecture. At our measured rate, 16 workers produce about 1.2M games per
+   hour.
+3. **Distill Pentobi level 9 with its opening book (~$500–1,500 of CPU).**
+   Level 9 takes minutes per game on one core. A few hundred thousand book-on
+   level-9 games (tens of thousands of core-hours) would give a much stronger
+   imitation prior and opening knowledge. That is the fastest route to match
+   Pentobi's top level before RL pushes past it.
+4. **Deeper exact solving (~$500).** With a precomputed endgame database
+   (positions with few pieces left, keyed by board region) and a parallel
+   solver, exact play could start 20+ plies before the end instead of about 10.
+   Duo is short (about 34 plies), so this covers a large fraction of every game.
+   Training the value head on those exact results removes most late-game noise.
+5. **League training against exploiters (~$1,000+).** As in AlphaStar,
+   periodically train "exploiter" agents whose only goal is to beat the current
+   main agent, and add them to its opponent pool. This exposes blind spots that
+   pure self-play shares with itself. Combined with the measured first-move
+   advantage (Pentobi level 8 wins 95% as first player), this would target the
+   hardest problem: winning from the second seat.
+6. **Opening book from massive search (~$300–600).** Search the first 4–6
+   plies with very large budgets (millions of simulations per position, on
+   many GPUs) and store the results as a book. With such a large first-move
+   advantage, the opening may decide a large share of games between strong
+   players.
 
 ## Phase results
 
@@ -564,3 +606,58 @@ from the first seat and 5% from the second. Pentobi took about 28 s per move.
 - `--opening-random-plies` in training
 - `--symmetries` for ensemble evaluation
 - schedule changes allowed on resume
+
+### Phase 8 result: Cornerstone 2.0 release — success
+
+29 October 2026.
+
+**Release.** The final RL network (823,673 self-play games) is
+`runs/v2-release/v2.pt`, SHA-256
+`81e4fa0948d3822b770d4b19e3bef9d0c7b32cf0ef32bee5f44eba62500111c4`; the
+same file is `/runs/rl-a/ema-00823673.pt` in the Modal Volume. It was chosen
+over the 698k checkpoint by head-to-head (51.75% [47.75, 55.75]) because it has
+the most training and the lowest final learning rate.
+
+**App.** `Play Blokus.command` opens with **Cornerstone 2.0** (the
+`python/blokus_rl/v2/play.py` path):
+- It searches in the Rust engine with exact endgame solving (gate 30, 2M nodes).
+- 2,048 simulations take about 1.2 s per move on the M2.
+- Earlier agents remain selectable, relabeled "Cornerstone 1.0 · …" and
+  "Cornerstone 2.0 · imitation stage".
+- External seats in the engine now answer their own forced passes, so the app
+  can request exactly one move.
+
+**Final ladder** (fresh openings, seed 8,000,000, never used for selection;
+800 simulations; 100 opening pairs = 200 games per level):
+
+| Pentobi level | Score | Interval | First seat | Second seat |
+|---|---:|---:|---:|---:|
+| 6 | **76.0%** | [71.25, 80.75] | 91.0% | 61.0% |
+| 7 | **58.25%** | [54.0, 62.5] | 85.5% | 31.0% |
+| 8 | **52.25%** | [49.0, 55.5] | 81.5% | 23.0% |
+
+Together with the imitation results (89% against level 4, 80.5% against
+level 5), Cornerstone 2.0 clears Pentobi levels 4 through 7 under the ≥55% rule
+and is level with level 8. That is past the level-5 to level-9 range the
+project set out to climb one rung at a time. Cornerstone 1.0 stopped between
+levels 3 and 4. Level 9 has only a 20-game sample (45%, earlier network).
+
+**Not reached:** beating level 8 decisively, and level 9. The seat split shows
+why. Cornerstone wins most first-seat games, but from the second seat it wins
+only 23% against level 8. Pentobi beats itself 95% of the time from the first
+seat at that level. The "Beyond the budget" section above lists the most
+promising ways forward.
+
+**Cost.** Modal metered spend went from $55.56 to about $103.8 for the whole
+v2 effort (about $48):
+- self-play RL: about $37
+- Pentobi data: about $5
+- benchmarks, imitation training and image builds: about $6
+
+Nothing was billed beyond credits, and about $26 of credits remain. No Modal
+apps are running.
+
+**Documentation.**
+- [Cornerstone 2.0 architecture](cornerstone-2.0-architecture.md)
+- this roadmap, with a result section per phase
+- README section at the top

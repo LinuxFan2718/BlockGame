@@ -106,3 +106,17 @@ def test_solver_matches_python_minimax_late_in_games():
             assert action in position.legal_actions()
             checked += 1
     assert checked == 18
+
+
+def test_single_move_choice_for_the_app():
+    from blokus_rl.v2.play import choose_move
+
+    torch.manual_seed(0)
+    evaluator = v2.Evaluator(DuoNetV2(blocks=1, channels=16, context=8), "cpu")
+    game, moves = DuoGame(), []
+    for _ in range(6):
+        for simulations in (0, 16):
+            action = choose_move(evaluator, moves, simulations)
+            assert action in game.legal_actions()
+        game.step(action)
+        moves.append(action)
