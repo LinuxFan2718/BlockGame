@@ -135,3 +135,82 @@ look most promising.
 ## Phase results
 
 Each phase adds its outcome here after it finishes, successful or not.
+
+### Phase 1 result: Rust self-play engine — success
+
+28 October 2026. No Modal spend.
+
+**What was built.**
+- `src/duo_engine.rs` runs hundreds of concurrent games, split into two groups.
+  - `prepare(group)` advances every game in a group in parallel with rayon. Each
+    game searches until it needs network evaluations, moves as soon as its own
+    search finishes, and a finished game is replaced immediately.
+  - `apply(group, …)` backs up the results.
+  - Python only evaluates the network, overlapping one group's evaluation with
+    Rust searching the other (`python/blokus_rl/v2/engine.py`).
+- `src/duo_mcts.rs` is a new search tree:
+  - stores only the root position and replays paths with trusted moves
+  - first-play urgency (FPU) reduction: an unexplored move is valued at the
+    parent's value minus 0.25 × √(prior mass already visited), instead of a draw
+  - keeps the chosen subtree between moves
+  - backs up exact values for finished (and later, solved) positions without
+    calling the network
+- `src/duo_v2.rs` builds the inputs: nine rules-derived planes, in the mover's
+  frame:
+  - own and opponent occupancy
+  - attach corners
+  - forbidden cells
+  - cells reachable by each side's legal moves
+  - an on-board plane
+
+  It also builds 48 scalars (both inventories, scores, passes, seat, and the log
+  of each side's legal-move count) and the tables for the four board symmetries
+  that keep both start squares.
+- `src/duo_replay.rs` stores games as move lists plus visit counts. Features,
+  targets, final ownership and margins are rebuilt at sampling time under a
+  random symmetry, so the whole replay checkpoints in a few bytes per move.
+- `python/blokus_rl/v2/model.py` is the v2 network: residual blocks with
+  KataGo-style global pooling and scalar conditioning in every block. Its heads
+  are the policy (17,837 outputs), win/draw/loss, score margin and per-cell
+  ownership. At 6 blocks × 64 channels it has 571k parameters.
+
+**Correctness.** 13 Rust unit tests, including proofs of:
+- the symmetry tables against cell geometry
+- encodings under all four symmetries
+- each feature plane against its rule definition
+- the policy-index frame
+- tree visit accounting and virtual-loss cleanup
+- subtree reuse
+- engine games replaying to the same final scores
+- external seats
+- replay serialization round-trips
+
+There are 4 new Python tests, and all 118 earlier Python tests still pass.
+
+**Move generation.** Generating legal moves from a compact, cache-friendly
+per-cell placement table, and reading the legal set from a bitset (already
+sorted), raised single-core speed from 22.9k to 53.6k positions/s. That includes
+generating the opponent's moves for the new mobility planes. The existing
+test comparing move generation against a brute-force scan still passes.
+
+**Throughput (M2 MacBook, 8 cores).** A stand-in network with uniform priors
+isolates the CPU side:
+
+| Setup | Positions/s | Mean batch |
+|---|---:|---:|
+| v1 collector, one worker (1 core), v1 settings | 31k | 61 |
+| v2 engine, 1 core, same v1 settings and game count | 53.6k | 105 |
+| v2 engine, 8 cores, 512 games, v2 settings (128 fast / 1,024 full at 25%) | **233k** | **567** |
+| v1 complete pipeline on the Modal L40S, for reference | 66–79k | 85 |
+
+With the real 6×64 network on the M2's Metal GPU, end-to-end self-play ran at
+5.3k positions/s. The network alone runs at about 4.7k/s, so the loop keeps the
+GPU busy and the M2 GPU is simply the limit. A 4×32 network ran at 9.8k/s.
+
+Two Metal-specific slowdowns were found and fixed:
+- mean/max over two dimensions was about 20× slower than flattening first
+- `index_add_` was about 30× slower than a padded softmax
+
+**Conclusion.** The CPU side is no longer the bottleneck: the Mac alone searches
+3× faster than v1's whole L40S pipeline. On a CUDA GPU the network becomes the
+limit, which is the right problem to have. Phase 6 measures this on Modal.

@@ -17,18 +17,39 @@ pub const STARTS: [usize; 2] = [4 * SIZE + 4, 9 * SIZE + 9];
 const ALL_PIECES: u32 = (1 << PIECES) - 1;
 type Shape = Vec<(i8, i8)>;
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-struct Bits([u64; 4]);
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub struct Bits(pub [u64; 4]);
 
 impl Bits {
-    fn insert(&mut self, cell: usize) {
+    pub fn insert(&mut self, cell: usize) {
         self.0[cell / 64] |= 1 << (cell % 64);
     }
-    fn contains(self, cell: usize) -> bool {
+    pub fn contains(self, cell: usize) -> bool {
         self.0[cell / 64] & (1 << (cell % 64)) != 0
     }
-    fn intersects(self, other: Self) -> bool {
+    pub fn intersects(self, other: Self) -> bool {
         (0..4).any(|i| self.0[i] & other.0[i] != 0)
+    }
+    pub fn union(self, other: Self) -> Self {
+        Self(std::array::from_fn(|i| self.0[i] | other.0[i]))
+    }
+    pub fn minus(self, other: Self) -> Self {
+        Self(std::array::from_fn(|i| self.0[i] & !other.0[i]))
+    }
+    pub fn count(self) -> u32 {
+        self.0.iter().map(|w| w.count_ones()).sum()
+    }
+    pub fn cells(self) -> impl Iterator<Item = usize> {
+        (0..4).flat_map(move |word| {
+            let mut bits = self.0[word];
+            std::iter::from_fn(move || {
+                (bits != 0).then(|| {
+                    let cell = word * 64 + bits.trailing_zeros() as usize;
+                    bits &= bits - 1;
+                    cell
+                })
+            })
+        })
     }
 }
 
@@ -47,14 +68,22 @@ pub struct Placement {
     pub row: usize,
     pub col: usize,
     pub cells: Vec<usize>,
-    mask: Bits,
+    pub mask: Bits,
 }
 
 struct Catalog {
     pieces: Vec<Shape>,
     orientations: Vec<Orientation>,
     placements: Vec<Option<Placement>>,
-    by_cell: Vec<Vec<usize>>,
+    /// Placements covering each cell, stored contiguously for move generation.
+    compact: Vec<Vec<Compact>>,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct Compact {
+    mask: Bits,
+    action: u16,
+    piece: u8,
 }
 
 fn normalize(mut cells: Shape) -> Shape {
@@ -157,11 +186,27 @@ fn catalog() -> &'static Catalog {
                 by_cell[cell].push(p.action);
             }
         }
+        let compact = by_cell
+            .iter()
+            .map(|actions| {
+                actions
+                    .iter()
+                    .map(|&a| {
+                        let p = placements[a].as_ref().unwrap();
+                        Compact {
+                            mask: p.mask,
+                            action: a as u16,
+                            piece: p.piece as u8,
+                        }
+                    })
+                    .collect()
+            })
+            .collect();
         Catalog {
             pieces,
             orientations,
             placements,
-            by_cell,
+            compact,
         }
     })
 }
@@ -198,6 +243,7 @@ impl std::error::Error for MoveError {}
 pub struct Game {
     board: [u8; CELLS],
     occupied: Bits,
+    owned: [Bits; 2],
     edges: [Bits; 2],
     corners: [Bits; 2],
     remaining: [u32; 2],
@@ -219,6 +265,7 @@ impl Game {
         Self {
             board: [0; CELLS],
             occupied: Bits::default(),
+            owned: [Bits::default(); 2],
             edges: [Bits::default(); 2],
             corners: [Bits::default(); 2],
             remaining: [ALL_PIECES; 2],
@@ -274,19 +321,69 @@ impl Game {
         }
     }
     fn legal_placement(&self, p: &Placement) -> bool {
-        if self.remaining[self.turn] & (1 << p.piece) == 0
+        self.legal_placement_for(self.turn, p)
+    }
+    fn legal_placement_for(&self, player: usize, p: &Placement) -> bool {
+        if self.remaining[player] & (1 << p.piece) == 0
             || p.mask.intersects(self.occupied)
-            || p.mask.intersects(self.edges[self.turn])
+            || p.mask.intersects(self.edges[player])
         {
             return false;
         }
-        if self.last_piece[self.turn].is_some() {
-            p.mask.intersects(self.corners[self.turn])
-        } else if let Some(first) = self.first_start {
-            p.mask.contains(STARTS[1 - first])
+        if self.last_piece[player].is_some() {
+            p.mask.intersects(self.corners[player])
         } else {
-            STARTS.iter().any(|&cell| p.mask.contains(cell))
+            self.start_cells_for(player)
+                .iter()
+                .any(|&cell| p.mask.contains(cell))
         }
+    }
+    /// Start squares `player` could still use for a first piece (empty list after it).
+    fn start_cells_for(&self, player: usize) -> Vec<usize> {
+        if self.last_piece[player].is_some() {
+            vec![]
+        } else if let Some(first) = self.first_start {
+            // The first player claimed `first`; whoever has not placed takes the other.
+            vec![STARTS[1 - first]]
+        } else {
+            STARTS.to_vec()
+        }
+    }
+    /// Empty cells where `player` could attach a new piece by a corner. Before the
+    /// first piece these are the usable start squares. Rules-derived, no heuristics.
+    pub fn attach_cells(&self, player: usize) -> Bits {
+        if self.last_piece[player].is_none() {
+            let mut bits = Bits::default();
+            for cell in self.start_cells_for(player) {
+                if !self.occupied.contains(cell) {
+                    bits.insert(cell);
+                }
+            }
+            bits
+        } else {
+            self.corners[player].minus(self.edges[player].union(self.occupied))
+        }
+    }
+    /// Empty cells `player` may never fill because they touch its own pieces by an edge.
+    pub fn forbidden_cells(&self, player: usize) -> Bits {
+        self.edges[player].minus(self.occupied)
+    }
+    pub fn owned_cells(&self, player: usize) -> Bits {
+        self.owned[player]
+    }
+    pub fn remaining_mask(&self, player: usize) -> u32 {
+        self.remaining[player]
+    }
+    pub fn last_piece(&self, player: usize) -> Option<usize> {
+        self.last_piece[player]
+    }
+    /// Index into STARTS of the square the first player used, once chosen.
+    pub fn first_start(&self) -> Option<usize> {
+        self.first_start
+    }
+    /// The player whose turn it is, even after termination (for search bookkeeping).
+    pub fn turn(&self) -> usize {
+        self.turn
     }
     pub fn legal_actions_scan(&self) -> Vec<usize> {
         if self.terminal {
@@ -309,42 +406,67 @@ impl Game {
         if self.terminal {
             return vec![];
         }
-        let mut anchors = Bits::default();
-        if self.last_piece[self.turn].is_some() {
-            for i in 0..4 {
-                anchors.0[i] = self.corners[self.turn].0[i]
-                    & !(self.edges[self.turn].0[i] | self.occupied.0[i]);
-            }
-        } else {
-            for cell in self.required_starts() {
-                anchors.insert(cell);
+        self.legal_actions_for(self.turn)
+    }
+
+    /// Placements `player` could make if it were to move now; `[PASS]` when none.
+    /// Used for the opponent's mobility features; it does not change whose turn it is.
+    pub fn legal_actions_for(&self, player: usize) -> Vec<usize> {
+        let mut legal = [0_u64; PASS.div_ceil(64)];
+        let mut any = false;
+        self.scan_for(player, |c| {
+            legal[usize::from(c.action) / 64] |= 1 << (c.action % 64);
+            any = true;
+        });
+        if !any {
+            return vec![PASS];
+        }
+        // Reading the bitset in order yields the canonical sorted action list.
+        let mut actions = Vec::with_capacity(256);
+        for (word, &bits) in legal.iter().enumerate() {
+            let mut bits = bits;
+            while bits != 0 {
+                actions.push(word * 64 + bits.trailing_zeros() as usize);
+                bits &= bits - 1;
             }
         }
+        actions
+    }
+
+    /// Union of cells covered by `player`'s legal placements, and their count.
+    pub fn reach_for(&self, player: usize) -> (Bits, usize) {
+        let mut cells = Bits::default();
+        let mut count = 0;
+        self.scan_for(player, |c| {
+            cells = cells.union(c.mask);
+            count += 1;
+        });
+        (cells, count)
+    }
+
+    /// Visit each legal placement of `player` once. Every candidate covers an
+    /// attach cell (or a usable start square), so it is legal exactly when its
+    /// piece remains and it avoids occupied cells and the player's own edges.
+    fn scan_for(&self, player: usize, mut visit: impl FnMut(&Compact)) {
+        let anchors = self.attach_cells(player);
+        let blocked = self.occupied.union(self.edges[player]);
+        let remaining = self.remaining[player];
         let mut seen = [0_u64; PASS.div_ceil(64)];
-        let mut actions = Vec::new();
-        for word in 0..4 {
-            let mut bits = anchors.0[word];
-            while bits != 0 {
-                let cell = word * 64 + bits.trailing_zeros() as usize;
-                bits &= bits - 1;
-                for &action in &catalog().by_cell[cell] {
-                    let bit = 1_u64 << (action % 64);
-                    if seen[action / 64] & bit != 0 {
-                        continue;
-                    }
-                    seen[action / 64] |= bit;
-                    let placement = catalog().placements[action].as_ref().unwrap();
-                    if self.legal_placement(placement) {
-                        actions.push(action);
-                    }
+        for cell in anchors.cells() {
+            for c in &catalog().compact[cell] {
+                if remaining & (1 << c.piece) == 0 {
+                    continue;
+                }
+                let (word, bit) = (usize::from(c.action) / 64, 1_u64 << (c.action % 64));
+                if seen[word] & bit != 0 {
+                    continue;
+                }
+                seen[word] |= bit;
+                if !c.mask.intersects(blocked) {
+                    visit(c);
                 }
             }
         }
-        actions.sort_unstable(); // Preserve the canonical ordering and tie breaks.
-        if actions.is_empty() {
-            actions.push(PASS);
-        }
-        actions
     }
 
     /// The score is meaningful at any point, but determines the winner only at termination.
@@ -375,12 +497,22 @@ impl Game {
             if self.legal_actions().first() != Some(&PASS) {
                 return Err(MoveError::MustPlace);
             }
+        } else if !placement(action).is_some_and(|p| self.legal_placement(p)) {
+            return Err(MoveError::IllegalPlacement);
+        }
+        Ok(self.apply_trusted(action))
+    }
+
+    /// Apply an action already taken from this position's own legal list.
+    /// Search replays thousands of known-legal paths; re-validating each would
+    /// regenerate the move list for every pass.
+    pub fn apply_trusted(&mut self, action: usize) -> [f32; 2] {
+        debug_assert!(!self.terminal);
+        if action == PASS {
             self.passes += 1;
             self.terminal = self.passes == 2;
         } else {
-            let p = placement(action)
-                .filter(|p| self.legal_placement(p))
-                .ok_or(MoveError::IllegalPlacement)?;
+            let p = placement(action).expect("trusted placement");
             if self.first_start.is_none() {
                 self.first_start = STARTS.iter().position(|&cell| p.mask.contains(cell));
             }
@@ -388,6 +520,7 @@ impl Game {
             for &cell in &p.cells {
                 self.board[cell] = player as u8 + 1;
                 self.occupied.insert(cell);
+                self.owned[player].insert(cell);
                 let (r, c) = (cell / SIZE, cell % SIZE);
                 for (dr, dc) in [(-1, 0), (1, 0), (0, -1), (0, 1)] {
                     if let Some(n) = neighbor(r, c, dr, dc) {
@@ -408,9 +541,9 @@ impl Game {
         if self.terminal {
             let scores = self.scores();
             let reward = (scores[0] - scores[1]).signum() as f32;
-            Ok([reward, -reward])
+            [reward, -reward]
         } else {
-            Ok([0.0, 0.0])
+            [0.0, 0.0]
         }
     }
 }

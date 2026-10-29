@@ -19,7 +19,12 @@
 
 mod agent;
 pub mod duo;
+pub mod duo_engine;
+pub mod duo_mcts;
+pub mod duo_replay;
 pub mod duo_search;
+pub mod duo_solver;
+pub mod duo_v2;
 mod game;
 
 pub use agent::{Agent, RandomAgent};

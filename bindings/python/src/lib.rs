@@ -1,5 +1,6 @@
 //! A thin Python boundary. All board changes and rewards come from the Rust engine.
 mod duo_features;
+mod v2;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use tic_tac_toe::duo;
@@ -92,6 +93,11 @@ fn _native(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PyDuoSearch>()?;
     module.add_function(wrap_pyfunction!(duo_pieces, module)?)?;
     module.add_function(wrap_pyfunction!(duo_policy_indices, module)?)?;
+    module.add_class::<v2::PyEngine>()?;
+    module.add_class::<v2::PyReplay>()?;
+    module.add_function(wrap_pyfunction!(v2::duo_v2_encode, module)?)?;
+    module.add_function(wrap_pyfunction!(v2::duo_v2_shapes, module)?)?;
+    module.add_function(wrap_pyfunction!(v2::duo_solve, module)?)?;
     Ok(())
 }
 
