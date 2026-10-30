@@ -154,8 +154,11 @@ class Learner:
 
         return contextlib.nullcontext()
 
-    def step(self, sample):
+    def step(self, sample, targets=None):
+        """One gradient step; `targets(batch)` may rewrite the targets first."""
         batch = to_tensors(sample, self.device)
+        if targets:
+            targets(batch)
         with self.autocast():
             total, parts = losses(self.model, batch, self.config)
         self.optimizer.zero_grad(set_to_none=True)
@@ -255,7 +258,7 @@ def save_checkpoint(out, learner, replay, stats, config):
     save(out / "latest.pt", learner.ema, {"steps": learner.steps, "games": stats["games"]})
 
 
-def train(config, out, *, init=None, imitation=None, resume=False, commit=None):
+def train(config, out, *, init=None, imitation=None, resume=False, commit=None, seed_replay=None):
     out = Path(out)
     torch.manual_seed(config.seed)
     device = torch.device(config.device)
@@ -292,6 +295,13 @@ def train(config, out, *, init=None, imitation=None, resume=False, commit=None):
             model = build({"blocks": config.blocks, "channels": config.channels, "context": 64})
         learner = Learner(config, model)
         replay = DuoReplay(config.replay_capacity)
+        if seed_replay:
+            # Continue from another run's positions; they count as already trained on.
+            replay = DuoReplay.from_bytes(Path(seed_replay).read_bytes())
+            replay.capacity = config.replay_capacity
+            imitation_n = int(round(config.imitation_fraction * config.batch_size)) if imitation else 0
+            target = config.train_ratio * replay.added_positions
+            learner.samples = math.ceil(target * config.batch_size / (config.batch_size - imitation_n))
         stats = {"games": 0, "elapsed": 0.0}
         atomic_write(out / "config.json", json.dumps(asdict(config), indent=2))
     imitation_replay = DuoReplay.from_bytes(Path(imitation).read_bytes()) if imitation else None
@@ -399,12 +409,14 @@ def main():
     parser.add_argument("--init", type=Path)
     parser.add_argument("--imitation", type=Path)
     parser.add_argument("--resume", action="store_true")
+    parser.add_argument("--seed-replay", type=Path, help="start from another run's replay.bin")
     defaults = TrainConfig()
     for name, value in asdict(defaults).items():
         parser.add_argument("--" + name.replace("_", "-"), type=type(value), default=value)
     args = parser.parse_args()
     config = TrainConfig(**{k: getattr(args, k) for k in asdict(defaults)})
-    stats = train(config, args.out, init=args.init, imitation=args.imitation, resume=args.resume)
+    stats = train(config, args.out, init=args.init, imitation=args.imitation, resume=args.resume,
+                  seed_replay=args.seed_replay)
     print(json.dumps(stats))
 
 

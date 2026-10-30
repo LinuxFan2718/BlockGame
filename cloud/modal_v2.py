@@ -197,7 +197,8 @@ def benchmark(configs: list):
 
 
 @app.function(image=image, gpu="L40S", cpu=32, memory=32768, timeout=6 * 3600, volumes={"/vol": volume})
-def train_remote(run: str, args: list, init: str = "", imitation: str = "", resume: bool = False):
+def train_remote(run: str, args: list, init: str = "", imitation: str = "", resume: bool = False,
+                 seed_replay: str = ""):
     """Self-play training into /vol/runs/<run>; resumable. `args` are train.py flags."""
     limit_threads()
     from blokus_rl.v2 import train as trainer
@@ -210,6 +211,8 @@ def train_remote(run: str, args: list, init: str = "", imitation: str = "", resu
         command += ["--imitation", imitation]
     if resume:
         command.append("--resume")
+    if seed_replay:
+        command += ["--seed-replay", seed_replay]
     parser_args = command
     import sys
 
@@ -227,6 +230,7 @@ def train_remote(run: str, args: list, init: str = "", imitation: str = "", resu
         parser.add_argument("--init", type=Path)
         parser.add_argument("--imitation", type=Path)
         parser.add_argument("--resume", action="store_true")
+        parser.add_argument("--seed-replay", type=Path)
         defaults = trainer.TrainConfig()
         for name, value in asdict(defaults).items():
             parser.add_argument("--" + name.replace("_", "-"), type=type(value), default=value)
@@ -239,6 +243,7 @@ def train_remote(run: str, args: list, init: str = "", imitation: str = "", resu
             imitation=parsed.imitation,
             resume=parsed.resume,
             commit=volume.commit,
+            seed_replay=parsed.seed_replay,
         )
     volume.commit()
     return stats
@@ -267,6 +272,35 @@ def imitate_remote(name: str, inputs: list, args: list):
     return (out / "progress.jsonl").read_text().splitlines()[-1]
 
 
+@app.function(image=image, gpu="L40S", cpu=8, memory=32768, timeout=2 * 3600, volumes={"/vol": volume})
+def distill_remote(name: str, args: list):
+    """Warm-start a larger network into /vol/distill/<name>; `args` are distill.py flags."""
+    out = Path("/vol/distill") / name
+    stop = threading.Event()
+
+    def committer():
+        while not stop.wait(300):
+            volume.commit()
+
+    threading.Thread(target=committer, daemon=True).start()
+    try:
+        subprocess.run(
+            ["python", "-m", "blokus_rl.v2.distill", "--out", str(out), "--device", "cuda",
+             "--precision", "bfloat16", *args],
+            check=True,
+        )
+    finally:
+        stop.set()
+        volume.commit()
+    return (out / "progress.jsonl").read_text().splitlines()[-1]
+
+
+@app.local_entrypoint()
+def distill(name: str, args: str):
+    """Larger-network warm start on L40S + 8 cores (see cloud/v2_budget.py first)."""
+    print(distill_remote.remote(name, args.split()))
+
+
 @app.local_entrypoint()
 def data(name: str, levels: str, games: int, workers: int = 48, seed: int = 71_000_000,
          max_seconds: float = 3600.0):
@@ -292,6 +326,9 @@ def imitate(name: str, inputs: str, args: str = "", gpu: str = "L40S"):
 
 
 @app.local_entrypoint()
-def train(run: str, args: str = "", init: str = "", imitation: str = "", resume: bool = False):
-    """Self-play RL chunk on L40S + 32 cores (see cloud/v2_budget.py first)."""
-    print(json.dumps(train_remote.remote(run, args.split(), init, imitation, resume)))
+def train(run: str, args: str = "", init: str = "", imitation: str = "", resume: bool = False,
+          seed_replay: str = "", gpu: str = "L40S", hours: float = 6.0):
+    """Self-play RL chunk on a GPU + 32 cores; `hours` is the container timeout
+    (see cloud/v2_budget.py first)."""
+    function = train_remote.with_options(gpu=gpu, timeout=int(hours * 3600))
+    print(json.dumps(function.remote(run, args.split(), init, imitation, resume, seed_replay)))

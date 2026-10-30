@@ -15,7 +15,7 @@ import sys
 from pathlib import Path
 
 PROFILE = "linuxfan2718"
-CAP_USD = 118.0
+CAP_USD = 127.0
 MODAL = str(Path(__file__).resolve().parent.parent / ".venv-modal/bin/modal")
 
 
