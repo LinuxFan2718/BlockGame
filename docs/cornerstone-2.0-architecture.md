@@ -153,14 +153,15 @@ each played from both seats (200 games):
 | 6 | — | **76.0%** [71.25, 80.75] |
 | 7 | — | **58.25%** [54.0, 62.5] |
 | 8 | — | **52.25%** [49.0, 55.5] |
-| 9 | — | 45% in a 20-game sample (earlier RL network) |
+| 9 | — | **46.0%** [42.25, 49.75] |
 
 Head-to-head, the release network beats the imitation network 65.25%
 [61.0, 69.75], about +110 Elo from self-play.
 
 In Duo the first player wins most games at high levels: Pentobi beats itself
 95% of the time as first player at level 8. Against level 8, Cornerstone wins
-81.5% of its first-seat games but only 23% from the second seat. Winning from
+81.5% of its first-seat games but only 23% from the second seat (72.5% and
+19.5% against level 9). Winning from
 the second seat is its remaining weakness.
 
 ## 6. Code map

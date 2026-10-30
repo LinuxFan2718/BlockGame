@@ -25,11 +25,11 @@ openings of 4 random plies, each played from both seats = 200 games per level):
 | 6 | — | **76.0%** [71.25, 80.75] | 91.0% | 61.0% |
 | 7 | — | **58.25%** [54.0, 62.5] | 85.5% | 31.0% |
 | 8 | — | **52.25%** [49.0, 55.5] | 81.5% | 23.0% |
+| 9 | — | **46.0%** [42.25, 49.75] | 72.5% | 19.5% |
 
 Cornerstone 1.0 topped out between levels 3 and 4: about 58% against level 3
 and 34–44% against level 4 at 2,048 simulations. Cornerstone 2.0 clears levels
-4–7 and is even with level 8. A 20-game sample against level 9 (an earlier RL
-network) scored 45%.
+4–7, is even with level 8, and loses narrowly to level 9, Pentobi's strongest.
 
 ```sh
 # Pentobi ladder for any v2 checkpoint (Pentobi built in .local/pentobi-build)

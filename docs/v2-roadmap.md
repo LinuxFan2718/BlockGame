@@ -635,18 +635,26 @@ the most training and the lowest final learning rate.
 | 6 | **76.0%** | [71.25, 80.75] | 91.0% | 61.0% |
 | 7 | **58.25%** | [54.0, 62.5] | 85.5% | 31.0% |
 | 8 | **52.25%** | [49.0, 55.5] | 81.5% | 23.0% |
+| 9 | **46.0%** | [42.25, 49.75] | 72.5% | 19.5% |
 
 Together with the imitation results (89% against level 4, 80.5% against
 level 5), Cornerstone 2.0 clears Pentobi levels 4 through 7 under the ≥55% rule
 and is level with level 8. That is past the level-5 to level-9 range the
 project set out to climb one rung at a time. Cornerstone 1.0 stopped between
-levels 3 and 4. Level 9 has only a 20-game sample (45%, earlier network).
+levels 3 and 4. Against level 9, Pentobi's strongest, it loses narrowly:
+the interval's upper end is just under 50%.
 
 **Not reached:** beating level 8 decisively, and level 9. The seat split shows
 why. Cornerstone wins most first-seat games, but from the second seat it wins
-only 23% against level 8. Pentobi beats itself 95% of the time from the first
-seat at that level. The "Beyond the budget" section above lists the most
-promising ways forward.
+only 23% against level 8 and 19.5% against level 9. Pentobi beats itself 95%
+of the time from the first seat at level 8. The "Beyond the budget" section
+above lists the most promising ways forward.
+
+The level-9 games ran on 30 October after the release, 3 at a time. Each
+level-9 Pentobi process grows to 2.05 GB, and an earlier attempt that started
+one per game slot (64) ran a 16 GB Mac out of memory. The ladder now caps its
+Pentobi processes to fit available RAM and has a memory watchdog (`d145bfc`).
+The 200 games took 4.8 hours, and Pentobi used at most 6.1 GB.
 
 **Cost.** Modal metered spend went from $55.56 to about $103.8 for the whole
 v2 effort (about $48):
