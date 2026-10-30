@@ -669,3 +669,74 @@ apps are running.
 - [Cornerstone 2.0 architecture](cornerstone-2.0-architecture.md)
 - this roadmap, with a result section per phase
 - README section at the top
+
+### Bigger-network pilot result — no clear gain
+
+30 October 2026, after the release.
+
+**Why.** The 6×64 run's gains flattened after about 450k games. Neither 3,200
+simulations per move (+2 points) nor a symmetry ensemble (no change) moved it
+much, which pointed to network capacity as the limit. The pilot tested that
+cheaply before proposing a larger run.
+
+**Step 1: warm start by distillation** (`v2/distill.py`, `82670aa`). A 10×128
+network (3,465,342 parameters, six times the release's 571,006) trained for
+20,000 steps on rl-a's final replay (2.0M positions) plus 10% Pentobi games:
+- Targets blend in the release network's predictions: 25% of the policy, 50% of
+  the value and margin.
+- Training took 32 minutes on an L40S and cost $1.62.
+- Result: 52.0% [48.5, 55.5] against Cornerstone 2.0, so it started at the
+  teacher's strength.
+
+**Step 2: throughput.** With the 10×128 network, an L40S plays 7.9 games/s and
+an H100 17.4 games/s (6×64 on L40S: 20.5). That makes the H100 the cheaper GPU
+per game for the larger network: $0.091 vs $0.130 per thousand games.
+
+**Step 3: self-play.** Three hours on an H100 with 32 cores, starting from the
+distilled network. Settings:
+- replay seeded with rl-a's 2.0M positions (`--seed-replay`)
+- learning rate 2e-4
+- otherwise rl-a's settings
+
+It played 213,255 games at 19–21 games/s, with the first player winning 64%.
+
+**Result.** Head-to-head against Cornerstone 2.0 (100 opening pairs, 200 games
+each):
+
+| Network | Simulations | Score | Interval |
+|---|---:|---:|---:|
+| distilled, 0 RL games | 200 | 52.0% | [48.5, 55.5] |
+| 70,674 RL games | 200 | 50.5% | [47.25, 54.0] |
+| 142,603 RL games | 200 | 50.75% | [47.25, 54.5] |
+| 213,255 RL games | 200 | 49.75% | [46.5, 53.0] |
+| 213,255 RL games | 800 | 52.75% | [49.5, 56.0] |
+
+The larger network fits the self-play data better than the 6×64 did at the end
+of its run:
+
+| | 10×128 | 6×64 |
+|---|---:|---:|
+| Policy KL | 0.765 | 0.809 |
+| Value loss | 0.300 | 0.319 |
+
+It does not play measurably better. Three hours of self-play added nothing
+measurable on top of the warm start. The 800-simulation edge (+2.75 points) is
+inside the noise.
+
+**Interpretation.** At this scale, network size is not what limits Cornerstone.
+Self-play improves only as fast as it generates better games. Starting from
+2.0's own data and strength, 213k games (a quarter of rl-a) was not enough for
+the extra capacity to show. A larger network may still pay off over millions of
+games, as in "Beyond the budget" item 1. This pilot cannot confirm that, and it
+gives no reason to expect a large gain from size alone.
+
+**Not done.** The Pentobi ladder was skipped. A 2.75-point head-to-head edge
+would be too small to detect in 200 games against Pentobi (intervals are about
+±3.5 points). The release stays `runs/v2-release/v2.pt`.
+
+**Artifacts.** The checkpoints are `/runs/rl-b/ema-*.pt` and the distilled
+student is `/distill/big-a/student.pt` in the Modal Volume. Local copies are in
+`runs/v2-rl-b/` and `runs/v2-distill-big-a/`.
+
+**Cost.** About $19 (metered spend went from $103.8 to $123.1). About $7 of
+credits remain, which is too little for another useful GPU run.
