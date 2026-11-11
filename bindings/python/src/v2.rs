@@ -35,10 +35,26 @@ fn agent(d: &Bound<'_, PyDict>) -> PyResult<AgentConfig> {
     let base = AgentConfig::default();
     let p = SearchParams::default();
     let known = [
-        "net", "full_simulations", "fast_simulations", "full_probability", "noise_weight",
-        "noise_mass", "temperature_plies", "record", "reuse_tree", "external", "leaf_batch",
-        "solver_root_nodes", "solver_leaf_nodes", "solver_max_moves", "c_puct",
-        "fpu_reduction", "fpu_root", "virtual_loss", "score_weight", "score_scale",
+        "net",
+        "full_simulations",
+        "fast_simulations",
+        "full_probability",
+        "noise_weight",
+        "noise_mass",
+        "temperature_plies",
+        "record",
+        "reuse_tree",
+        "external",
+        "leaf_batch",
+        "solver_root_nodes",
+        "solver_leaf_nodes",
+        "solver_max_moves",
+        "c_puct",
+        "fpu_reduction",
+        "fpu_root",
+        "virtual_loss",
+        "score_weight",
+        "score_scale",
     ];
     for key in d.keys() {
         let key: String = key.extract()?;
@@ -80,7 +96,10 @@ fn finished_dict<'py>(py: Python<'py>, g: &FinishedGame) -> PyResult<Bound<'py, 
     d.set_item("seats", g.seats.to_vec())?;
     d.set_item("opening_plies", g.opening_plies)?;
     d.set_item("records", g.records.len())?;
-    d.set_item("solved_records", g.records.iter().filter(|r| r.solved).count())?;
+    d.set_item(
+        "solved_records",
+        g.records.iter().filter(|r| r.solved).count(),
+    )?;
     Ok(d)
 }
 
@@ -107,12 +126,15 @@ impl PyEngine {
         solver: bool,
     ) -> PyResult<Self> {
         if agents.len() != 2 || groups == 0 || slots < groups {
-            return Err(PyValueError::new_err("need two agents and slots >= groups >= 1"));
+            return Err(PyValueError::new_err(
+                "need two agents and slots >= groups >= 1",
+            ));
         }
         for opening in &openings {
             let mut game = duo::Game::new();
             for &m in opening {
-                game.step(m).map_err(|e| PyValueError::new_err(format!("opening: {e}")))?;
+                game.step(m)
+                    .map_err(|e| PyValueError::new_err(format!("opening: {e}")))?;
             }
         }
         let config = EngineConfig {
@@ -327,7 +349,8 @@ pub fn duo_v2_encode(
     }
     let mut game = duo::Game::new();
     for m in moves {
-        game.step(m).map_err(|e| PyValueError::new_err(e.to_string()))?;
+        game.step(m)
+            .map_err(|e| PyValueError::new_err(e.to_string()))?;
     }
     if game.is_terminal() {
         return Err(PyValueError::new_err("terminal position"));
@@ -352,7 +375,8 @@ pub fn duo_solve(
 ) -> PyResult<(Option<(i32, usize)>, u64)> {
     let mut game = duo::Game::new();
     for m in moves {
-        game.step(m).map_err(|e| PyValueError::new_err(e.to_string()))?;
+        game.step(m)
+            .map_err(|e| PyValueError::new_err(e.to_string()))?;
     }
     if game.is_terminal() {
         return Err(PyValueError::new_err("terminal position"));
@@ -364,7 +388,12 @@ pub fn duo_solve(
 
 #[pyfunction]
 pub fn duo_v2_shapes() -> (usize, usize, usize, usize) {
-    (duo_v2::PLANES, duo_v2::SCALARS, duo_v2::POLICY_SIZE, duo_v2::SYMMETRIES)
+    (
+        duo_v2::PLANES,
+        duo_v2::SCALARS,
+        duo_v2::POLICY_SIZE,
+        duo_v2::SYMMETRIES,
+    )
 }
 
 /// (cell map, policy-index map) for symmetry `sym`; unused policy ids map to 65535.
