@@ -10,7 +10,42 @@ opens with Cornerstone 2.0. It is a 6-block residual network searching in the
 Rust engine, and an exact solver plays its endgames perfectly. About 1 second
 per move at 2,048 simulations on an M2.
 
-How it was built and what it achieves:
+### How the model works
+
+Cornerstone chooses a move by searching a tree of future positions. At each
+new position a neural network answers two questions: which moves look
+promising, and who is winning.
+
+1. **Input.** The Rust engine describes the position from the mover's side:
+   nine 14×14 planes (each side's cells, the corners where each side could
+   attach a piece, cells each side can never fill, cells each side's legal moves
+   reach, and the board outline) and 48 numbers (both sets of remaining pieces,
+   scores, passes, who moved first, how many legal moves each side has). All of
+   it follows from the rules; none of it is strategy advice.
+2. **Network.** A residual CNN with 6 blocks of 64 channels (571,006
+   parameters). Every block mixes in a summary of the whole board and the 48
+   numbers, so a local pattern can depend on distant regions and on the pieces
+   left.
+3. **Outputs.** A *policy*: a score for each of 17,837 moves (91 oriented
+   shapes × 196 anchor squares, plus pass), normalised over the legal ones. A
+   *value*: the probabilities of a win, draw and loss, and the expected final
+   score margin. A fourth output, the final owner of every cell, exists only
+   as a training signal.
+4. **Search.** Monte Carlo tree search (PUCT) in Rust runs 800–2,048
+   simulations per move. Each one follows moves that combine a high policy
+   score with a good average value so far, has the network evaluate one new
+   position, and updates the averages along the path. A position is worth
+   P(win) − P(loss) plus a small bonus for margin. The most-visited move is
+   played.
+5. **Endgame.** Once the two sides together have at most 30 legal placements,
+   an exact alpha-beta solver takes over and plays the rest perfectly (search
+   remains the fallback if the solver exceeds its node budget).
+6. **Training.** The network first learned to imitate 32,358 Pentobi games,
+   then improved over 823,673 games against itself. The policy is trained
+   toward the search's visit counts; the other outputs toward how each game
+   actually ended (result, margin, final owner of each cell).
+
+More detail:
 - [Architecture](docs/cornerstone-2.0-architecture.md): the network, search,
   solver and training recipe, with credit to AlphaGo Zero, KataGo, AlphaBlokus
   and Pentobi.
@@ -38,7 +73,16 @@ and 34–44% against level 4 at 2,048 simulations. Cornerstone 2.0 clears levels
 .venv/bin/python -m blokus_rl.v2.arena A.pt B.pt --pairs 100 --simulations 200
 # Self-play training locally on Metal (cloud runs: cloud/modal_v2.py)
 .venv/bin/python -m blokus_rl.v2.train --out runs/my-run --init runs/v2-release/v2.pt --blocks 6 --channels 64
+# Where a run's time and money went (reads runs/my-run/progress.jsonl)
+.venv/bin/python -m blokus_rl.v2.profiling runs/my-run --usd-per-hour 3.72
+# What the network alone can evaluate per second on this device
+.venv/bin/python -m blokus_rl.v2.benchmark --network v2 --capacity
 ```
+
+Every training log row carries a `profile`: seconds per loop phase, GPU and CPU
+use, batch size and padding. The report turns a run's rows into throughput,
+utilisation and cost per 1,000 games; see `python/blokus_rl/v2/profiling.py`
+for how to read each field.
 
 The trained weights live in the ignored `runs/` directory
 (`runs/v2-release/v2.pt`) and in the Modal Volume `blokus-v2`. The rest of this
