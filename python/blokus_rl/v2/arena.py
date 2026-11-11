@@ -10,6 +10,8 @@ from ..duo_crossplay import opening_book, paired_interval
 from . import engine as v2
 
 PASS = 17836
+# Weight of the score-margin term in the search value (network and exact values alike).
+SCORE_WEIGHT = 0.05
 
 
 def replay_moves(moves):
@@ -101,8 +103,8 @@ def play(
 def head_to_head(model_a, model_b, device, *, pairs, simulations, seed=4040, slots=128):
     """Network A (agent 0) versus network B (agent 1), same search settings."""
     book = opening_book(pairs, plies=4, seed=seed)
-    a = v2.play_agent(simulations, net=0)
-    b = v2.play_agent(simulations, net=1)
+    a = v2.play_agent(simulations, net=0, score_weight=SCORE_WEIGHT)
+    b = v2.play_agent(simulations, net=1, score_weight=SCORE_WEIGHT)
     engine = v2.make_engine(
         [a, b],
         min(slots, 2 * pairs),
@@ -112,7 +114,7 @@ def head_to_head(model_a, model_b, device, *, pairs, simulations, seed=4040, slo
         shared_tree=False,
         seed=seed,
     )
-    evaluator = v2.Evaluator({0: model_a, 1: model_b}, device, score_weight=0.05)
+    evaluator = v2.Evaluator({0: model_a, 1: model_b}, device, score_weight=SCORE_WEIGHT)
     games = []
     v2.run(engine, evaluator, on_finished=games.extend)
     return summarize(games), games

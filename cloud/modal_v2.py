@@ -1,12 +1,16 @@
 """Modal functions for the v2 agent: Pentobi data on CPU, throughput benchmarks
 and self-play training on GPU. Results persist in the `blokus-v2` Volume.
 
-Spend only Modal credits: every launch goes through `cloud/v2_budget.py`, which
-refuses work whose worst-case cost would push total metered spend past the cap.
+Spend only Modal credits: run `python cloud/v2_budget.py check ...` before every
+launch. It exits non-zero when the worst-case cost would push total metered
+spend past the cap. Nothing in this file calls it, so that check is manual.
 
-    .venv-modal/bin/modal run cloud/modal_v2.py::pentobi_data --games 2000 ...
-    .venv-modal/bin/modal run cloud/modal_v2.py::benchmark --gpu L4 --cpu 16
-    .venv-modal/bin/modal run --detach cloud/modal_v2.py::train_remote --run NAME ...
+Launch through the local entrypoints (`data`, `bench`, `imitate`, `distill`,
+`train`), not the remote functions they wrap:
+
+    .venv-modal/bin/modal run cloud/modal_v2.py::data --name NAME --levels 7,8 --games 2000
+    .venv-modal/bin/modal run cloud/modal_v2.py::bench --configs="--games 256 --slots 512" --gpu L4
+    .venv-modal/bin/modal run --detach cloud/modal_v2.py::train --run NAME --args="--learning-rate 3e-4"
 """
 
 import io
@@ -221,9 +225,8 @@ def train_remote(run: str, args: list, init: str = "", imitation: str = "", resu
     telemetry_dir = Path("/vol/telemetry")
     telemetry_dir.mkdir(exist_ok=True)
     with Telemetry(telemetry_dir / f"{run}.jsonl"):
-        from dataclasses import asdict
-
         import argparse
+        from dataclasses import asdict
 
         parser = argparse.ArgumentParser()
         parser.add_argument("--out", type=Path, required=True)

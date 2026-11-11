@@ -17,7 +17,7 @@ import numpy as np
 import torch
 
 from .._native import DuoEngine, duo_v2_symmetry
-from .model import MARGIN_SCALE, PLANES, SIZE
+from .model import MARGIN_SCALE, PLANES, POLICY_SIZE, SIZE
 
 
 def default_device():
@@ -115,7 +115,7 @@ class Evaluator:
                 if (nets == key).any()
             ]
         if len(self.models) > 1:
-            logits = torch.empty(n, 17837, device=self.device)
+            logits = torch.empty(n, POLICY_SIZE, device=self.device)
             values = torch.empty(n, device=self.device)
         with self.autocast():
             for model, index in groups:

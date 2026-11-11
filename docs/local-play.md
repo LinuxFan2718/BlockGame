@@ -57,8 +57,9 @@ and final-monomino bonuses.
 also works while the bot is thinking: a cancelled/stale search cannot change the
 restored board. Starting a new game likewise invalidates the prior search. New
 game settings offer either seat, network-only/128/512/2,048 simulations, backend,
-and available frozen checkpoints. The default is the seed-1071 replication,
-without a claim that it is strongest against every opponent.
+and available frozen checkpoints. The default is Cornerstone 2.0
+(`runs/v2-release/v2.pt`) when that file is present; otherwise the first
+available earlier checkpoint. Earlier agents stay selectable.
 
 Keyboard users can choose pieces with Tab/Enter, navigate board cells with arrow
 keys, and place with Enter or Space. Color and text labels identify turns and

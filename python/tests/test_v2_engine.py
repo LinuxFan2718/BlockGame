@@ -1,10 +1,9 @@
 import numpy as np
 import torch
-
 from blokus_rl._native import DuoGame, DuoReplay, duo_solve, duo_v2_encode
 from blokus_rl.v2 import engine as v2
 from blokus_rl.v2.benchmark import UniformEvaluator
-from blokus_rl.v2.model import DuoNetV2, POLICY_SIZE
+from blokus_rl.v2.model import POLICY_SIZE, DuoNetV2
 
 
 def small_agent(**overrides):

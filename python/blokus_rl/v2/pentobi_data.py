@@ -107,10 +107,14 @@ def main():
     parser.add_argument("--inputs", type=Path, nargs="*")
     args = parser.parse_args()
     if args.replay:
+        if not args.inputs:
+            parser.error("--replay needs --inputs")
         replay = build_replay(args.inputs)
         args.replay.write_bytes(bytes(replay.to_bytes()))
         print(json.dumps({"games": replay.games, "positions": len(replay)}))
         return
+    if args.out is None:
+        parser.error("--out is required when generating games")
     generate(
         args.out, args.levels, args.games, args.workers, args.seed, args.binary,
         args.random_plies, args.max_seconds,

@@ -261,8 +261,8 @@ def main():
             configure_torch(42)
             serve(args.checkpoint, args.device, args.port, not args.no_browser)
         elif args.command in ("duo-evaluate", "duo-play"):
-            from .duo_learning import BASELINES, evaluate_duo, load_duo, play_duo
             from .duo_device import inference_device
+            from .duo_learning import BASELINES, evaluate_duo, load_duo, play_duo
 
             configure_torch(args.seed)
             policy = args.checkpoint if args.checkpoint in BASELINES else load_duo(args.checkpoint)
