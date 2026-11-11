@@ -1,6 +1,9 @@
+import json
+
 import numpy as np
 import torch
 from blokus_rl._native import DuoGame, DuoReplay
+from blokus_rl.v2 import profiling
 from blokus_rl.v2 import train as trainer
 from blokus_rl.v2.model import DuoNetV2
 
@@ -56,3 +59,24 @@ def test_checkpoint_round_trip(tmp_path):
     assert len(restored) == len(replay)
     for a, b in zip(other.ema.state_dict().values(), learner.ema.state_dict().values()):
         assert torch.equal(a, b)
+
+
+def test_training_log_rows_carry_a_profile(tmp_path):
+    """A few self-play games end to end; replay_min keeps gradient steps out."""
+    config = trainer.TrainConfig(
+        blocks=1, channels=16, device="cpu", slots=8, games=4, full_simulations=8,
+        fast_simulations=4, replay_min=10**9, max_seconds=120.0, log_seconds=0.01,
+    )
+    stats = trainer.train(config, tmp_path / "run")
+    assert stats["games"] == 4
+    rows = profiling.load_rows(tmp_path / "run")
+    assert rows
+    profile = rows[-1]["profile"]
+    assert {"prepare", "submit", "collect", "apply", "callbacks"} <= set(profile["phases"])
+    assert profile["seconds"] > 0 and profile["cpus"] >= 1
+    summary = profiling.summarize(rows, usd_per_hour=1.0)
+    assert 0 <= summary["games"] <= 4 and summary["steps"] == 0
+    assert summary["evaluations"] > 0 and summary["padding"] == 0
+    assert summary["phases"]["prepare"] > 0
+    assert "evaluations/s" in profiling.render(summary)
+    json.dumps(summary)

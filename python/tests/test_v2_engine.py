@@ -1,6 +1,9 @@
+import time
+
 import numpy as np
 import torch
 from blokus_rl._native import DuoGame, DuoReplay, duo_solve, duo_v2_encode
+from blokus_rl.v2 import benchmark
 from blokus_rl.v2 import engine as v2
 from blokus_rl.v2.benchmark import UniformEvaluator
 from blokus_rl.v2.model import POLICY_SIZE, DuoNetV2
@@ -45,6 +48,66 @@ def test_network_probabilities_are_normalized_over_legal_moves():
         assert abs(probabilities[a:b].sum() - 1) < 1e-4
     assert np.all(np.abs(values) <= 1)
     engine.apply(0, probabilities, values)
+    # Off CUDA nothing is padded, so every row the network ran was a position.
+    assert (evaluator.positions, evaluator.batches, evaluator.rows) == (len(counts), 1, len(counts))
+
+
+class ScriptedEngine:
+    """Stands in for DuoEngine: each group hands out `batches` one-position batches."""
+
+    def __init__(self, batches, delay=0.0):
+        self.batches, self.delay = batches, delay
+        self.left, self.applied = [batches, batches], [0, 0]
+
+    def prepare(self, group):
+        time.sleep(self.delay)
+        if not self.left[group]:
+            return b"", b"", b"", b"", b""
+        self.left[group] -= 1
+        return b"", b"", b"", np.ones(1, np.uint32).tobytes(), b""
+
+    def apply(self, group, probabilities, values):
+        self.applied[group] += 1
+
+    def drain(self, replay):
+        return []
+
+    def done(self):
+        return self.applied == [self.batches, self.batches]
+
+    def counters(self):
+        return {"simulations": sum(self.applied), "evaluations": sum(self.applied)}
+
+
+def test_run_times_every_phase():
+    engine, timings = ScriptedEngine(5, delay=0.001), {}
+    v2.run(engine, UniformEvaluator(), timings=timings)
+    assert engine.applied == [5, 5]
+    assert set(timings) == {"prepare", "submit", "collect", "apply", "callbacks"}
+    assert timings["prepare"] >= 5 * 0.001
+
+
+def test_threaded_run_publishes_timings_while_it_runs():
+    engine, timings, seen = ScriptedEngine(40, delay=0.002), {}, []
+
+    def poll():
+        seen.append(timings["prepare"])
+
+    v2.run_threaded(engine, UniformEvaluator(), poll=poll, timings=timings)
+    assert engine.applied == [40, 40]
+    # Both self-play threads add to the same totals.
+    assert timings["prepare"] >= 2 * 40 * 0.002
+    assert all(timings[key] >= 0 for key in ("submit", "collect", "apply", "callbacks"))
+    # The main thread could read them before the workers finished.
+    assert any(0 < value < timings["prepare"] for value in seen)
+
+
+def test_capacity_measures_the_evaluator_alone():
+    torch.manual_seed(0)
+    evaluator = v2.Evaluator(DuoNetV2(blocks=1, channels=16, context=8), "cpu")
+    result = benchmark.capacity(evaluator, batch_sizes=(4, 16), legal=7, seconds=0.05)
+    assert set(result) == {4, 16} and all(rate > 0 for rate in result.values())
+    assert evaluator.positions == evaluator.rows >= 2 * (4 + 16)
 
 
 def test_encoder_policy_indices_cover_the_policy_space():

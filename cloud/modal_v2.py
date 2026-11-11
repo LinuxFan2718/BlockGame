@@ -5,11 +5,16 @@ Spend only Modal credits: run `python cloud/v2_budget.py check ...` before every
 launch. It exits non-zero when the worst-case cost would push total metered
 spend past the cap. Nothing in this file calls it, so that check is manual.
 
+Every training log row carries a `profile` (phase times, GPU and CPU use, batch
+fill); `python -m blokus_rl.v2.profiling RUN_DIR --usd-per-hour RATE` sums a run
+up once its `progress.jsonl` is downloaded from the Volume.
+
 Launch through the local entrypoints (`data`, `bench`, `imitate`, `distill`,
 `train`), not the remote functions they wrap:
 
     .venv-modal/bin/modal run cloud/modal_v2.py::data --name NAME --levels 7,8 --games 2000
     .venv-modal/bin/modal run cloud/modal_v2.py::bench --configs="--games 256 --slots 512" --gpu L4
+    .venv-modal/bin/modal run cloud/modal_v2.py::bench --configs="--capacity --precision bfloat16" --gpu L40S
     .venv-modal/bin/modal run --detach cloud/modal_v2.py::train --run NAME --args="--learning-rate 3e-4"
 """
 

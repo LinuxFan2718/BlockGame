@@ -1,4 +1,9 @@
-"""Measure self-play throughput of the Rust engine (with or without a network)."""
+"""Measure self-play throughput of the Rust engine (with or without a network).
+
+`--capacity` instead measures the network alone on a steady queue of full
+batches. Self-play's evaluations per second divided by that figure is roughly
+how much of the device a configuration uses.
+"""
 
 import argparse
 import json
@@ -8,7 +13,8 @@ import numpy as np
 import torch
 
 from . import engine as v2
-from .model import DuoNetV2
+from . import profiling
+from .model import PLANES, POLICY_SIZE, SCALARS, SIZE, DuoNetV2
 
 
 class UniformEvaluator:
@@ -49,8 +55,13 @@ def measure(evaluator, games, slots, agent, seed=1):
     started = time.perf_counter()
     records = []
     timings = {}
+    gpu = profiling.GpuSampler(interval=1.0).start()
+    profile = profiling.Profile(timings, evaluator, gpu, counters=engine.counters)
     runner = v2.run_threaded if getattr(evaluator, "device", None) is not None and evaluator.device.type == "cuda" else v2.run
-    runner(engine, evaluator, on_finished=records.extend, timings=timings)
+    try:
+        runner(engine, evaluator, on_finished=records.extend, timings=timings)
+    finally:
+        gpu.stop()
     seconds = time.perf_counter() - started
     evaluator.submit = original
     counters = engine.counters()
@@ -65,8 +76,36 @@ def measure(evaluator, games, slots, agent, seed=1):
         "median_batch": float(np.median(sizes)),
         "recorded_positions": int(sum(r["records"] for r in records)),
         "timings": {k: round(v, 2) for k, v in timings.items()},
+        "profile": profile.lap(),
         **counters,
     }
+
+
+def capacity(evaluator, batch_sizes=(256, 1024, 4096), legal=128, seconds=3.0):
+    """Positions per second the evaluator sustains on full batches of random
+    positions with `legal` moves each. The next batch is always queued before
+    the previous one is collected, as in self-play, so the device never waits
+    for the host: a reference for self-play's evaluations per second."""
+    rng = np.random.default_rng(0)
+    results = {}
+    for n in batch_sizes:
+        batch = (
+            bytearray(rng.integers(0, 2, (n, PLANES, SIZE, SIZE), dtype=np.uint8).tobytes()),
+            bytearray(rng.random((n, SCALARS), dtype=np.float32).tobytes()),
+            bytearray(rng.integers(0, POLICY_SIZE, n * legal, dtype=np.uint16).tobytes()),
+            bytearray(np.full(n, legal, np.uint32).tobytes()),
+            bytearray(n),
+        )
+        evaluator.collect(evaluator.submit(batch))  # warm-up: autotuning, allocator
+        started, done = time.perf_counter(), n
+        pending = evaluator.submit(batch)
+        while time.perf_counter() - started < seconds:
+            following = evaluator.submit(batch)
+            evaluator.collect(pending)
+            pending, done = following, done + n
+        evaluator.collect(pending)
+        results[n] = round(done / (time.perf_counter() - started))
+    return results
 
 
 def main():
@@ -85,7 +124,13 @@ def main():
     parser.add_argument("--solver-max-moves", type=int, default=0)
     parser.add_argument("--solver-root-nodes", type=int, default=0)
     parser.add_argument("--solver-leaf-nodes", type=int, default=0)
+    parser.add_argument(
+        "--capacity", action="store_true",
+        help="measure the network alone (positions/s by batch size) instead of self-play",
+    )
     args = parser.parse_args()
+    if args.capacity and args.network != "v2":
+        parser.error("--capacity needs --network v2")
     agent = v2.self_play_agent(
         fast_simulations=args.fast,
         full_simulations=args.full,
@@ -101,7 +146,10 @@ def main():
         model = DuoNetV2(args.blocks, args.channels).to(args.device).eval()
         evaluator = v2.Evaluator(model, args.device, precision=args.precision)
         torch.set_grad_enabled(False)
-    result = measure(evaluator, args.games, args.slots, agent)
+    if args.capacity:
+        result = {"capacity_positions_per_second": capacity(evaluator)}
+    else:
+        result = measure(evaluator, args.games, args.slots, agent)
     result.update(vars(args), torch_threads=torch.get_num_threads())
     print(json.dumps(result))
 

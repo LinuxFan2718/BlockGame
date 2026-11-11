@@ -50,6 +50,7 @@ class Evaluator:
         self.score_weight, self.score_scale = score_weight, score_scale
         self.positions = 0
         self.batches = 0
+        self.rows = 0  # batch rows sent to the network, padding included
         self.seconds = 0.0
         self.channels_last = self.device.type == "cuda"
         if self.device.type == "cuda":
@@ -137,6 +138,7 @@ class Evaluator:
         probabilities = torch.softmax(padded, 1)[rows, cols]
         self.positions += n
         self.batches += 1
+        self.rows += len(x)
         self.seconds += time.perf_counter() - started
         event = None
         if self.device.type == "cuda":
@@ -227,7 +229,8 @@ def run_threaded(engine, evaluator, *, on_finished=None, replay=None, poll=None,
     """Like `run`, but each game group gets its own thread (prepare → evaluate →
     apply), so one group's Rust work overlaps the other's GPU submission. The
     main thread drains finished games and runs `poll` (e.g. training steps).
-    No external seats."""
+    No external seats. `timings` is updated as the run goes, so `poll` may read it;
+    the four self-play phases are summed over both threads."""
     stop = threading.Event()
     errors = []
     spent = timings if timings is not None else {}
@@ -237,33 +240,30 @@ def run_threaded(engine, evaluator, *, on_finished=None, replay=None, poll=None,
 
     def worker(group):
         clock = time.perf_counter
-        local = dict.fromkeys(("prepare", "submit", "collect", "apply"), 0.0)
         try:
             while not stop.is_set():
                 t0 = clock()
                 batch = engine.prepare(group)
                 t1 = clock()
                 handle = evaluator.submit(batch)
-                t2 = clock()
-                local["prepare"] += t1 - t0
-                local["submit"] += t2 - t1
+                t2 = t3 = t4 = clock()
+                if handle is not None:
+                    result = evaluator.collect(handle)
+                    t3 = clock()
+                    engine.apply(group, *result)
+                    t4 = clock()
+                with lock:  # two workers add to the same totals
+                    spent["prepare"] += t1 - t0
+                    spent["submit"] += t2 - t1
+                    spent["collect"] += t3 - t2
+                    spent["apply"] += t4 - t3
                 if handle is None:
                     if engine.done():
                         return
                     time.sleep(0.001)
-                    continue
-                result = evaluator.collect(handle)
-                t3 = clock()
-                engine.apply(group, *result)
-                local["collect"] += t3 - t2
-                local["apply"] += clock() - t3
         except BaseException as error:  # surface worker failures in the main thread
             errors.append(error)
             stop.set()
-        finally:
-            with lock:
-                for key, value in local.items():
-                    spent[key] += value
 
     threads = [threading.Thread(target=worker, args=(g,), daemon=True) for g in range(2)]
     for thread in threads:

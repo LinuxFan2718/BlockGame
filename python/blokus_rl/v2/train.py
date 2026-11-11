@@ -9,6 +9,9 @@ resume after interruption.
 Targets per recorded position (all rebuilt by Rust under a random symmetry):
 search visit distribution, win/draw/loss, final score margin, final owner of
 each cell.
+
+Each row of `progress.jsonl` also carries a `profile` of the interval: phase
+times, CPU and GPU use, batch fill. See `profiling.py`.
 """
 
 import argparse
@@ -26,6 +29,7 @@ from torch.nn import functional as F
 
 from .._native import DuoReplay
 from . import engine as v2
+from . import profiling
 from .model import MARGIN_SCALE, PLANES, SIZE, build, load, save
 
 
@@ -331,6 +335,14 @@ def train(config, out, *, init=None, imitation=None, resume=False, commit=None, 
     window_stats = {"games": 0, "length": 0, "margin": 0.0, "first_wins": 0, "solved": 0}
     rng = np.random.default_rng(config.seed + learner.steps)
     log = (out / "progress.jsonl").open("a")
+    timings = {}
+    gpu = profiling.GpuSampler().start()
+    profile = profiling.Profile(
+        timings,
+        evaluator,
+        gpu,
+        counters=lambda: {"games": stats["games"], "steps": learner.steps, **engine.counters()},
+    )
 
     def on_finished(games):
         for g in games:
@@ -351,14 +363,17 @@ def train(config, out, *, init=None, imitation=None, resume=False, commit=None, 
         )
         own_n = config.batch_size - imitation_n
         while len(replay) >= config.replay_min and learner.samples * own_n / config.batch_size < target:
-            parts = [replay.sample(own_n, window(replay, config), int(rng.integers(2**62)), True)]
-            if imitation_n:
-                parts.append(
-                    imitation_replay.sample(
-                        imitation_n, len(imitation_replay), int(rng.integers(2**62)), True
+            with profiling.timed(timings, "train_sample"):
+                parts = [replay.sample(own_n, window(replay, config), int(rng.integers(2**62)), True)]
+                if imitation_n:
+                    parts.append(
+                        imitation_replay.sample(
+                            imitation_n, len(imitation_replay), int(rng.integers(2**62)), True
+                        )
                     )
-                )
-            learner.step(concat_samples(parts))
+                sample = concat_samples(parts)
+            with profiling.timed(timings, "train_step"):
+                learner.step(sample)
         elapsed = base_elapsed + now - started
         if now - last_log >= config.log_seconds:
             g = max(window_stats["games"], 1)
@@ -376,6 +391,7 @@ def train(config, out, *, init=None, imitation=None, resume=False, commit=None, 
                 "evaluations_per_second": round(evaluator.positions / max(now - started, 1e-9)),
                 **{k: round(v, 4) for k, v in learner.drain_metrics().items()},
                 **engine.counters(),
+                "profile": profile.lap(),
             }
             log.write(json.dumps(row) + "\n")
             log.flush()
@@ -385,15 +401,21 @@ def train(config, out, *, init=None, imitation=None, resume=False, commit=None, 
             last_log = now
         if now - last_checkpoint >= config.checkpoint_seconds:
             stats["elapsed"] = elapsed
-            save_checkpoint(out, learner, replay, stats, config)
-            save(out / f"ema-{stats['games']:08d}.pt", learner.ema, {"steps": learner.steps})
+            with profiling.timed(timings, "checkpoint"):
+                save_checkpoint(out, learner, replay, stats, config)
+                save(out / f"ema-{stats['games']:08d}.pt", learner.ema, {"steps": learner.steps})
+                if commit:
+                    commit()
             last_checkpoint = now
-            if commit:
-                commit()
         return elapsed >= config.max_seconds
 
     runner = v2.run_threaded if device.type == "cuda" else v2.run
-    runner(engine, evaluator, on_finished=on_finished, replay=replay, poll=poll)
+    try:
+        runner(
+            engine, evaluator, on_finished=on_finished, replay=replay, poll=poll, timings=timings
+        )
+    finally:
+        gpu.stop()
     stats["elapsed"] = base_elapsed + time.monotonic() - started
     save_checkpoint(out, learner, replay, stats, config)
     save(out / f"ema-{stats['games']:08d}.pt", learner.ema, {"steps": learner.steps})
