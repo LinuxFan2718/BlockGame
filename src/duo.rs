@@ -291,33 +291,16 @@ impl Game {
     /// Empty corner anchors excluding own edge contacts. A remaining piece
     /// need not fit at every anchor; this is geometry rather than a move count.
     pub fn frontier_counts(&self) -> [usize; 2] {
-        std::array::from_fn(|player| {
-            if self.last_piece[player].is_none() {
-                let starts = self
-                    .first_start
-                    .map_or_else(|| STARTS.to_vec(), |first| vec![STARTS[1 - first]]);
-                starts.iter().filter(|&&cell| self.board[cell] == 0).count()
-            } else {
-                (0..4)
-                    .map(|i| {
-                        (self.corners[player].0[i]
-                            & !(self.edges[player].0[i] | self.occupied.0[i]))
-                            .count_ones() as usize
-                    })
-                    .sum()
-            }
-        })
+        std::array::from_fn(|player| self.attach_cells(player).count() as usize)
     }
     pub fn remaining(&self, player: usize) -> [bool; PIECES] {
         std::array::from_fn(|piece| self.remaining[player] & (1 << piece) != 0)
     }
     pub fn required_starts(&self) -> Vec<usize> {
-        if self.last_piece[self.turn].is_some() || self.terminal {
+        if self.terminal {
             vec![]
-        } else if let Some(first) = self.first_start {
-            vec![STARTS[1 - first]]
         } else {
-            STARTS.to_vec()
+            self.start_cells_for(self.turn)
         }
     }
     fn legal_placement(&self, p: &Placement) -> bool {

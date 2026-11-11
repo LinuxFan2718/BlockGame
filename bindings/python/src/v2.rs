@@ -340,8 +340,9 @@ pub fn duo_v2_encode(
     Ok((bytes(py, &planes), bytes(py, &scalars), legal, actions))
 }
 
-/// Exact solve of the position after `moves`: (margin for the mover, best action,
-/// nodes searched), or None when the node budget runs out.
+/// Exact solve of the position after `moves`. Returns `(result, nodes searched)`,
+/// where `result` is `(margin for the mover, best action)`, or None when the
+/// node budget runs out.
 #[pyfunction]
 #[pyo3(signature = (moves, budget=1_000_000))]
 pub fn duo_solve(
