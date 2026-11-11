@@ -1,7 +1,6 @@
 import time
 
 import pytest
-
 from blokus_rl.v2 import ladder
 
 GB = 1e9

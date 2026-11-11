@@ -1,6 +1,5 @@
 import numpy as np
 import torch
-
 from blokus_rl._native import DuoGame, DuoReplay
 from blokus_rl.v2 import train as trainer
 from blokus_rl.v2.model import DuoNetV2
