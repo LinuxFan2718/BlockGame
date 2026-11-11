@@ -30,7 +30,6 @@ from . import arena
 from . import engine as v2
 from .model import load
 
-PASS = 17836
 GB = 1e9
 
 # Pentobi 31.0 sizes its two search trees from the level it was started with
